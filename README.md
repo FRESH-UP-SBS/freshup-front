@@ -1,36 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🧹 청소 일정 관리 시스템 (FreshUp)
 
-## Getting Started
+> 공동 생활에서  
+> 청소 일정 관리와 벌금 정산을 효율적으로 관리하기 위한 서비스
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 📖 프로젝트 소개
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+청소 일정 관리 시스템은  
+팀 단위로 청소 업무를 분담하고,  
+이행 여부에 따라 벌금을 관리할 수 있는 서비스입니다.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+단순한 To-Do를 넘어  
+✔️ 캘린더 기반 일정 관리  
+✔️ 사용자별 역할 분담  
+✔️ 벌금 정산 현황 기능  
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 👥 참여 인원
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- 👩‍💻 감자 (Backend / Frontend)
+- 👩‍💻 언니 (기획 / UI 설계)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## 🚀 주요 기능
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 🔐 1. 카카오 로그인
+- 간편 로그인 지원
+- 사용자 인증 및 세션 관리
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+### 📅 2. 공유 캘린더 기반 청소 일정 관리
+- 월별 캘린더 UI 제공
+- 날짜별 청소 업무 확인
+- 이전/다음 월 이동 가능
+
+✔️ 기능
+- 청소 일정 등록
+- 수정 / 삭제
+- 담당자 지정
+
+---
+
+### 🧼 3. 청소 업무 관리 (관리자 기능)
+- 청소 업무 유형 관리 (예: 설거지, 빨래, 화장실 등)
+- 담당자 다중 선택
+- 일정 일괄 관리
+
+---
+
+### 💰 4. 벌금(패널티) 시스템
+- 청소 미이행 시 벌금 부여
+- 사용자별 벌금 현황 조회
+- 관리자 정산 상태 변경
+
+✔️ 기능
+- 정산 여부 관리
+- 기간 / 사용자별 필터링
+- 페이징 처리
+
+---
+
+### 👤 5. 마이페이지
+- 사용자 정보 조회
+- 금주 남은 청소 횟수
+- 총 벌금 / 미정산 벌금 확인
+
+---
+
+## 🧱 시스템 구조 (예정)
+
+```text
+Frontend (Next.js)
+        ↓
+Backend (Spring Boot)
+        ↓
+Database (Oracle)
