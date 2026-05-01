@@ -10,7 +10,7 @@ export default function LoginButton() {
             onClick={handleLogin}
             className="bg-yellow-400 text-black px-6 py-3 rounded-lg font-bold hover:bg-yellow-500 transition"
         >
-            카카오로 로그인dd
+            카카오로 로그인
         </button>
     );
 }
