@@ -4,11 +4,20 @@ import { useState } from 'react';
 import { DayPicker } from 'react-day-picker';
 import { Calendar, User } from 'lucide-react';
 import './calendar.css';
+import CleaningLogModal from '../../components/calendar/CleaningLogModal';
 
 const cleaningEvents = [
-  { date: '2026-04-09', tasks: ['바닥(이다솔)', '빨래(한현수)'] },
-  { date: '2026-04-11', tasks: ['설거지(이세빈)', '빨래(이해솔)'] },
-  { date: '2026-04-13', tasks: ['화장실(이보슬)'] },
+  { date: '2026-04-21', tasks: ['바닥(이다슬)', '빨래(이해슬)'] },
+  { date: '2026-04-23', tasks: ['설거지(이보슬)', '빨래(한현수)'] },
+  { date: '2026-04-24', tasks: ['화장실(이세빈)'] },
+];
+
+const penalties = [
+  { id: 1, name: '이해슬', amount: 5000, status: '정산필요' },
+  { id: 2, name: '한현수', amount: 5000, status: '정산필요' },
+  { id: 3, name: '이다슬', amount: 5000, status: '정산필요' },
+  { id: 4, name: '이보슬', amount: 5000, status: '정산필요' },
+  { id: 5, name: '이세빈', amount: 5000, status: '정산필요' },
 ];
 
 function formatDate(date: Date) {
@@ -21,6 +30,9 @@ function formatDate(date: Date) {
 
 export default function CalendarPage() {
   const [month, setMonth] = useState(new Date(2026, 3, 1));
+
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const getTasks = (date: Date) => {
     return cleaningEvents.find((event) => event.date === formatDate(date))?.tasks ?? [];
@@ -54,10 +66,7 @@ export default function CalendarPage() {
             weekday: 'fresh-weekday',
             weeks: 'fresh-weeks',
             week: 'fresh-week',
-            day: 'fresh-day',
-            day_button: 'fresh-day-button',
             outside: 'fresh-outside',
-            day_outside: 'fresh-outside',
             today: 'fresh-today',
           }}
           formatters={{
@@ -67,36 +76,32 @@ export default function CalendarPage() {
               ['일', '월', '화', '수', '목', '금', '토'][date.getDay()],
           }}
           components={{
-            Day: (props: any) => {
-              const isOutside =
-                props.day.date.getFullYear() !== month.getFullYear() ||
-                props.day.date.getMonth() !== month.getMonth();
-          
-              return (
-                <td
-                  {...props}
-                  className={`fresh-day ${isOutside ? 'is-outside-cell' : ''}`}
-                />
-              );
-            },
-          
-            DayButton: ({ day, ...props }) => {
+            Day: ({ day }) => {
               const tasks = getTasks(day.date);
-          
+            
               return (
-                <button {...props} type="button" className="fresh-day-button">
-                  <span className="fresh-day-number">
-                    {String(day.date.getDate()).padStart(2, '0')}
-                  </span>
-          
-                  <span className="fresh-task-list">
-                    {tasks.map((task) => (
-                      <span key={task} className="fresh-task">
-                        {task}
-                      </span>
-                    ))}
-                  </span>
-                </button>
+                <td className="fresh-day">
+                  <button
+                    type="button"
+                    className="fresh-day-button"
+                    onClick={() => {
+                      setSelectedDate(day.date);
+                      setIsModalOpen(true);
+                    }}
+                  >
+                    <span className="fresh-day-number">
+                      {String(day.date.getDate()).padStart(2, '0')}
+                    </span>
+            
+                    <span className="fresh-task-list">
+                      {tasks.map((task) => (
+                        <span key={task} className="fresh-task">
+                          {task}
+                        </span>
+                      ))}
+                    </span>
+                  </button>
+                </td>
               );
             },
           
@@ -106,8 +111,60 @@ export default function CalendarPage() {
               ) : (
                 <span className="nav-icon">›</span>
               ),
+
+              DayButton: ({ day, ...props }) => {
+                return (
+                  <button
+                    {...props}
+                    type="button"
+                    className="fresh-day-button"
+                    onClick={() => {
+                      setSelectedDate(day.date);   // 날짜 저장
+                      setIsModalOpen(true);        // 모달 열기
+                    }}
+                  >
+                    {day.date.getDate()}
+                  </button>
+                );
+              }
           }}
         />
+
+        {isModalOpen && selectedDate && (
+          <CleaningLogModal
+            date={selectedDate}
+            logs={
+              cleaningEvents.find(
+                (e) => e.date === formatDate(selectedDate)
+              )?.tasks.map((t, i) => ({
+                id: i,
+                taskName: t.split('(')[0],
+                memberName: t.split('(')[1]?.replace(')', ''),
+              })) ?? []
+            }
+            onClose={() => setIsModalOpen(false)}
+          />
+        )}
+
+        <section className="penalty-section">
+          <div className="penalty-header">
+            <h2>Penalty</h2>
+            <button className="penalty-more-btn">›</button>
+          </div>
+
+          <div className="penalty-list">
+            {penalties.map((penalty) => (
+              <label key={penalty.id} className="penalty-row">
+                <input type="checkbox" className="penalty-checkbox" />
+                <span className="penalty-name">{penalty.name}</span>
+                <span className="penalty-amount">
+                  {penalty.amount.toLocaleString()}원
+                </span>
+                <span className="penalty-status">{penalty.status}</span>
+              </label>
+            ))}
+          </div>
+        </section>
       </section>
 
       <nav className="bottom-nav">
