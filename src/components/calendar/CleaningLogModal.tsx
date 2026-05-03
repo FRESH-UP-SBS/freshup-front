@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Pencil, Trash2, Plus, X, Check } from 'lucide-react';
+import CleaningTaskAdminModal from './CleaningTaskAdminModal';
+import styles from './calendar.module.css';
 
 type CleaningLog = {
   id: number;
@@ -22,15 +24,28 @@ export default function CleaningLogModal({
   logs,
   onClose,
 }: CleaningLogModalProps) {
+  const [modalMode, setModalMode] = useState<'log' | 'admin'>('log');
+  const [localLogs, setLocalLogs] = useState<CleaningLog[]>(logs);
+
   const [isAddMode, setIsAddMode] = useState(false);
-  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [selectedWork, setSelectedWork] = useState('');
   const [isWorkDropdownOpen, setIsWorkDropdownOpen] = useState(false);
+
+  const [editingLogId, setEditingLogId] = useState<number | null>(null);
+  const [editTaskName, setEditTaskName] = useState('');
+  const [isEditDropdownOpen, setIsEditDropdownOpen] = useState(false);
+
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const month = date.getMonth() + 1;
   const day = date.getDate();
+
+  useEffect(() => {
+    setLocalLogs(logs);
+  }, [logs]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -46,126 +61,300 @@ export default function CleaningLogModal({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleChangeAdminMode = () => {
+    setModalMode('admin');
+    setIsAddMode(false);
+    setIsWorkDropdownOpen(false);
+    setEditingLogId(null);
+    setIsEditDropdownOpen(false);
+  };
+
+  const handleChangeLogMode = () => {
+    setModalMode('log');
+  };
+
+  const handleStartEdit = (log: CleaningLog) => {
+    setEditingLogId(log.id);
+    setEditTaskName(log.taskName);
+
+    setIsAddMode(false);
+    setSelectedWork('');
+    setIsWorkDropdownOpen(false);
+    setIsEditDropdownOpen(false);
+  };
+
+  const handleSaveEdit = () => {
+    if (editingLogId === null || !editTaskName.trim()) return;
+
+    setLocalLogs((prev) =>
+      prev.map((log) =>
+        log.id === editingLogId ? { ...log, taskName: editTaskName } : log
+      )
+    );
+
+    setEditingLogId(null);
+    setEditTaskName('');
+    setIsEditDropdownOpen(false);
+  };
+
+  const handleDeleteClick = (id: number) => {
+    setDeleteTargetId(id);
+    setIsAlertOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteTargetId === null) return;
+
+    setLocalLogs((prev) => prev.filter((log) => log.id !== deleteTargetId));
+    setDeleteTargetId(null);
+    setIsAlertOpen(false);
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteTargetId(null);
+    setIsAlertOpen(false);
+  };
+
   return (
-    <div className="cleaning-modal-backdrop">
-      <section className="cleaning-modal">
-        <header className="cleaning-modal-header">
+    <div className={styles['cleaning-modal-backdrop']} onClick={onClose}>
+      <section
+        className={styles['cleaning-modal']}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className={styles['cleaning-modal-header']}>
           <h2>
-            {month}.{String(day).padStart(2, '0')}
+            {modalMode === 'log'
+              ? `${month}.${String(day).padStart(2, '0')}`
+              : 'Work'}
           </h2>
-        </header>
 
-        <button type="button" className="cleaning-close-btn" onClick={onClose}>
-          <X size={22} />
-        </button>
-
-        <div className="cleaning-modal-body">
-          <div className="cleaning-log-list">
-            {logs.length > 0 ? (
-              logs.map((log) => (
-                <div key={log.id} className="cleaning-log-row">
-                  <p>
-                    {log.taskName}({log.memberName})
-                  </p>
-
-                  <div className="cleaning-log-actions">
-                    <button type="button" className="cleaning-action-btn">
-                      <Pencil size={18} />
-                    </button>
-
-                    <button type="button" className="cleaning-action-btn danger">
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="cleaning-empty">등록된 청소 기록이 없습니다.</p>
-            )}
-          </div>
-
-          {!isAddMode && (
-            <button
-                type="button"
-                className="cleaning-inline-add-btn"
-                onClick={() => {
-                setIsAddMode(true);
-                setIsWorkDropdownOpen(false);
-                }}
-            >
-                <Plus size={24} />
-            </button>
-          )}
-
-          {isAddMode && (
-            <div className="cleaning-dropdown-row" ref={dropdownRef}>
-              <div className="cleaning-dropdown-wrap">
-                <button
-                  type="button"
-                  className="cleaning-dropdown-button"
-                  onClick={() => setIsWorkDropdownOpen((prev) => !prev)}
-                >
-                  <span className={!selectedWork ? 'placeholder' : ''}>
-                    {selectedWork || '업무를 선택하세요'}
-                  </span>
-
-                  <ChevronDown
-                    size={22}
-                    className={`cleaning-dropdown-icon ${
-                      isWorkDropdownOpen ? 'open' : ''
-                    }`}
-                  />
-                </button>
-
-                {isWorkDropdownOpen && (
-                  <ul className="cleaning-dropdown-list">
-                    {workOptions.map((work) => (
-                      <li key={work}>
-                        <button
-                          type="button"
-                          className={`cleaning-dropdown-option ${
-                            selectedWork === work ? 'selected' : ''
-                          }`}
-                          onClick={() => {
-                            setSelectedWork(work);
-                            setIsWorkDropdownOpen(false);
-                          }}
-                        >
-                          {work}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                <button type="button" className="cleaning-save-icon-btn">
-                  <Check size={22} />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <button
-          type="button"
-          className="cleaning-modal-icon-btn"
-          onClick={() => setIsAdminModalOpen(true)}
-        >
-          <Plus size={28} />
-        </button>
-
-        {isAdminModalOpen && (
-          <div className="cleaning-admin-mini-modal">
-            <div className="cleaning-admin-mini-box">
+          <div className={styles['cleaning-header-actions']}>
+            {modalMode === 'log' && (
               <button
                 type="button"
-                className="cleaning-admin-close"
-                onClick={() => setIsAdminModalOpen(false)}
+                className={styles['cleaning-admin-btn']}
+                onClick={handleChangeAdminMode}
               >
-                <X size={18} />
+                Admin Mode
               </button>
-              <strong>청소 업무 관리</strong>
-              <p>청소 업무 추가/수정/삭제 모달 자리입니다.</p>
+            )}
+
+            {modalMode === 'admin' && (
+              <button
+                type="button"
+                className={styles['cleaning-admin-btn']}
+                onClick={handleChangeLogMode}
+              >
+                Schedule Mode
+              </button>
+            )}
+
+            <button
+              type="button"
+              className={styles['cleaning-close-btn']}
+              onClick={onClose}
+            >
+              <X size={22} />
+            </button>
+          </div>
+        </header>
+
+        <div className={styles['cleaning-modal-body']}>
+          {modalMode === 'log' && (
+            <>
+              <div className={styles['cleaning-log-list']}>
+                {localLogs.length > 0 ? (
+                  localLogs.map((log) => (
+                    <div key={log.id} className={styles['cleaning-log-row']}>
+                      {editingLogId === log.id ? (
+                        <div className={styles['cleaning-log-edit-wrap']}>
+                          <button
+                            type="button"
+                            className={styles['cleaning-log-edit-button']}
+                            onClick={() =>
+                              setIsEditDropdownOpen((prev) => !prev)
+                            }
+                          >
+                            <span>{editTaskName || '업무를 선택하세요'}</span>
+
+                            <ChevronDown
+                              size={22}
+                              className={`${styles['cleaning-log-edit-icon']} ${
+                                isEditDropdownOpen ? styles.open : ''
+                              }`}
+                            />
+                          </button>
+
+                          {isEditDropdownOpen && (
+                            <ul className={styles['cleaning-log-edit-list']}>
+                              {workOptions.map((work) => (
+                                <li key={work}>
+                                  <button
+                                    type="button"
+                                    className={`${styles['cleaning-log-edit-option']} ${
+                                      editTaskName === work
+                                        ? styles.selected
+                                        : ''
+                                    }`}
+                                    onClick={() => {
+                                      setEditTaskName(work);
+                                      setIsEditDropdownOpen(false);
+                                    }}
+                                  >
+                                    {work}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      ) : (
+                        <p>
+                          {log.taskName}({log.memberName})
+                        </p>
+                      )}
+
+                      <div className={styles['cleaning-log-actions']}>
+                        {editingLogId === log.id ? (
+                          <button
+                            type="button"
+                            className={styles['cleaning-action-btn']}
+                            onClick={handleSaveEdit}
+                          >
+                            <Check size={18} />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className={styles['cleaning-action-btn']}
+                            onClick={() => handleStartEdit(log)}
+                          >
+                            <Pencil size={18} />
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          className={`${styles['cleaning-action-btn']} ${styles.danger}`}
+                          onClick={() => handleDeleteClick(log.id)}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className={styles['cleaning-empty']}>
+                    등록된 청소 기록이 없습니다.
+                  </p>
+                )}
+              </div>
+
+              {isAddMode && (
+                <div
+                  className={styles['cleaning-dropdown-row']}
+                  ref={dropdownRef}
+                >
+                  <div className={styles['cleaning-dropdown-wrap']}>
+                    <button
+                      type="button"
+                      className={styles['cleaning-dropdown-button']}
+                      onClick={() => setIsWorkDropdownOpen((prev) => !prev)}
+                    >
+                      <span className={!selectedWork ? styles.placeholder : ''}>
+                        {selectedWork || '업무를 선택하세요'}
+                      </span>
+
+                      <ChevronDown
+                        size={22}
+                        className={`${styles['cleaning-dropdown-icon']} ${
+                          isWorkDropdownOpen ? styles.open : ''
+                        }`}
+                      />
+                    </button>
+
+                    {isWorkDropdownOpen && (
+                      <ul className={styles['cleaning-dropdown-list']}>
+                        {workOptions.map((work) => (
+                          <li key={work}>
+                            <button
+                              type="button"
+                              className={`${styles['cleaning-dropdown-option']} ${
+                                selectedWork === work ? styles.selected : ''
+                              }`}
+                              onClick={() => {
+                                setSelectedWork(work);
+                                setIsWorkDropdownOpen(false);
+                              }}
+                            >
+                              {work}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    className={styles['cleaning-log-save-btn']}
+                  >
+                    <Check size={22} />
+                  </button>
+                </div>
+              )}
+
+              <button
+                type="button"
+                className={`${styles['cleaning-modal-icon-btn']} ${
+                  isAddMode || editingLogId !== null
+                    ? styles['close-mode']
+                    : ''
+                }`}
+                onClick={() => {
+                  if (isAddMode || editingLogId !== null) {
+                    setIsAddMode(false);
+                    setEditingLogId(null);
+                    setEditTaskName('');
+                    setSelectedWork('');
+                    setIsWorkDropdownOpen(false);
+                    setIsEditDropdownOpen(false);
+                    return;
+                  }
+
+                  setIsAddMode(true);
+                }}
+              >
+                <Plus size={28} />
+              </button>
+            </>
+          )}
+
+          {modalMode === 'admin' && <CleaningTaskAdminModal />}
+        </div>
+
+        {isAlertOpen && (
+          <div className={styles['custom-alert-backdrop']}>
+            <div className={styles['custom-alert']}>
+              <p>해당 업무를 삭제하시겠습니까?</p>
+
+              <div className={styles['custom-alert-actions']}>
+                <button
+                  type="button"
+                  className={styles.cancel}
+                  onClick={handleCancelDelete}
+                >
+                  취소
+                </button>
+
+                <button
+                  type="button"
+                  className={styles.confirm}
+                  onClick={handleConfirmDelete}
+                >
+                  확인
+                </button>
+              </div>
             </div>
           </div>
         )}

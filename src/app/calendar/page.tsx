@@ -2,14 +2,38 @@
 
 import { useState } from 'react';
 import { DayPicker } from 'react-day-picker';
-import { Calendar, User } from 'lucide-react';
-import './calendar.css';
+import styles from '@/components/calendar/calendar.module.css';
 import CleaningLogModal from '../../components/calendar/CleaningLogModal';
+import { useRouter } from 'next/navigation';
+import BottomNav from '../../components/ui/BottomNav';
+
+type CleaningTask = {
+  id: number;
+  taskName: string;
+  memberName: string;
+};
 
 const cleaningEvents = [
-  { date: '2026-04-21', tasks: ['바닥(이다슬)', '빨래(이해슬)'] },
-  { date: '2026-04-23', tasks: ['설거지(이보슬)', '빨래(한현수)'] },
-  { date: '2026-04-24', tasks: ['화장실(이세빈)'] },
+  {
+    date: '2026-04-21',
+    tasks: [
+      { id: 1, taskName: '바닥', memberName: '이다슬' },
+      { id: 2, taskName: '빨래', memberName: '이해슬' },
+    ],
+  },
+  {
+    date: '2026-04-23',
+    tasks: [
+      { id: 3, taskName: '설거지', memberName: '이보슬' },
+      { id: 4, taskName: '빨래', memberName: '한현수' },
+    ],
+  },
+  {
+    date: '2026-04-24',
+    tasks: [
+      { id: 5, taskName: '화장실', memberName: '이세빈' },
+    ],
+  },
 ];
 
 const penalties = [
@@ -28,22 +52,39 @@ function formatDate(date: Date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function getSettlementDday() {
+  const today = new Date();
+  const day = today.getDay();
+
+  const remainDays = day === 0 ? 0 : 7 - day;
+
+  return remainDays === 0 ? 'D-DAY' : `D-${remainDays}`;
+}
+
 export default function CalendarPage() {
+  const router = useRouter(); // ✅ 추가
+
   const [month, setMonth] = useState(new Date(2026, 3, 1));
-
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const getTasks = (date: Date) => {
+  const settlementDday = getSettlementDday();
+
+  const getTasks = (date: Date): CleaningTask[] => {
     return cleaningEvents.find((event) => event.date === formatDate(date))?.tasks ?? [];
   };
 
   return (
-    <main className="calendar-page">
-      <section className="calendar-card">
-        <div className="calendar-title-box">
-          <p>FRESHUP</p>
-          <h1>Cleaning Calendar</h1>
+    <main className={styles['calendar-page']}>
+      <section className={styles['calendar-card']}>
+        <div className={styles['calendar-title-row']}>
+          <div className={styles['calendar-title-box']}>
+            <p>FRESHUP</p>
+            <h1>Cleaning Calendar</h1>
+          </div>
+
+          <div className={styles['settlement-dday-box']}>
+            <strong>{settlementDday}</strong>
+          </div>
         </div>
 
         <DayPicker
@@ -51,23 +92,23 @@ export default function CalendarPage() {
           onMonthChange={setMonth}
           showOutsideDays
           weekStartsOn={1}
-          className="fresh-calendar"
+          className={styles['fresh-calendar']}
           classNames={{
-            root: 'fresh-calendar-root',
-            months: 'fresh-months',
-            month: 'fresh-month',
-            month_caption: 'fresh-caption',
-            caption_label: 'fresh-caption-label',
-            nav: 'fresh-nav',
-            button_previous: 'fresh-nav-button',
-            button_next: 'fresh-nav-button',
-            month_grid: 'fresh-grid',
-            weekdays: 'fresh-weekdays',
-            weekday: 'fresh-weekday',
-            weeks: 'fresh-weeks',
-            week: 'fresh-week',
-            outside: 'fresh-outside',
-            today: 'fresh-today',
+            root: styles['fresh-calendar-root'],
+            months: styles['fresh-months'],
+            month: styles['fresh-month'],
+            month_caption: styles['fresh-caption'],
+            caption_label: styles['fresh-caption-label'],
+            nav: styles['fresh-nav'],
+            button_previous: styles['fresh-nav-button'],
+            button_next: styles['fresh-nav-button'],
+            month_grid: styles['fresh-grid'],
+            weekdays: styles['fresh-weekdays'],
+            weekday: styles['fresh-weekday'],
+            weeks: styles['fresh-weeks'],
+            week: styles['fresh-week'],
+            outside: styles['fresh-outside'],
+            today: styles['fresh-today'],
           }}
           formatters={{
             formatCaption: (date) =>
@@ -76,27 +117,33 @@ export default function CalendarPage() {
               ['일', '월', '화', '수', '목', '금', '토'][date.getDay()],
           }}
           components={{
-            Day: ({ day }) => {
+            Day: ({ day, ...props }) => {
               const tasks = getTasks(day.date);
-            
+
+              const isOutside =
+                day.date.getFullYear() !== month.getFullYear() ||
+                day.date.getMonth() !== month.getMonth();
+
               return (
-                <td className="fresh-day">
+                <td
+                  {...props}
+                  className={`${styles['fresh-day']} ${
+                    isOutside ? styles['fresh-outside-day'] : ''
+                  }`}
+                >
                   <button
                     type="button"
-                    className="fresh-day-button"
-                    onClick={() => {
-                      setSelectedDate(day.date);
-                      setIsModalOpen(true);
-                    }}
+                    className={styles['fresh-day-button']}
+                    onClick={() => setSelectedDate(day.date)}
                   >
-                    <span className="fresh-day-number">
+                    <span className={styles['fresh-day-number']}>
                       {String(day.date.getDate()).padStart(2, '0')}
                     </span>
-            
-                    <span className="fresh-task-list">
+
+                    <span className={styles['fresh-task-list']}>
                       {tasks.map((task) => (
-                        <span key={task} className="fresh-task">
-                          {task}
+                        <span key={task.id} className={styles['fresh-task']}>
+                          {task.taskName}({task.memberName})
                         </span>
                       ))}
                     </span>
@@ -104,78 +151,47 @@ export default function CalendarPage() {
                 </td>
               );
             },
-          
+
             Chevron: ({ orientation }) =>
               orientation === 'left' ? (
-                <span className="nav-icon">‹</span>
+                <span className={styles['nav-icon']}>‹</span>
               ) : (
-                <span className="nav-icon">›</span>
+                <span className={styles['nav-icon']}>›</span>
               ),
-
-              DayButton: ({ day, ...props }) => {
-                return (
-                  <button
-                    {...props}
-                    type="button"
-                    className="fresh-day-button"
-                    onClick={() => {
-                      setSelectedDate(day.date);   // 날짜 저장
-                      setIsModalOpen(true);        // 모달 열기
-                    }}
-                  >
-                    {day.date.getDate()}
-                  </button>
-                );
-              }
           }}
         />
 
-        {isModalOpen && selectedDate && (
+        {selectedDate && (
           <CleaningLogModal
             date={selectedDate}
-            logs={
-              cleaningEvents.find(
-                (e) => e.date === formatDate(selectedDate)
-              )?.tasks.map((t, i) => ({
-                id: i,
-                taskName: t.split('(')[0],
-                memberName: t.split('(')[1]?.replace(')', ''),
-              })) ?? []
-            }
-            onClose={() => setIsModalOpen(false)}
+            logs={getTasks(selectedDate)}
+            onClose={() => setSelectedDate(null)}
           />
         )}
 
-        <section className="penalty-section">
-          <div className="penalty-header">
+        <section className={styles['penalty-section']}>
+          <div className={styles['penalty-header']}>
             <h2>Penalty</h2>
-            <button className="penalty-more-btn">›</button>
+            <button type="button" className={styles['penalty-more-btn']}>
+              ›
+            </button>
           </div>
 
-          <div className="penalty-list">
+          <div className={styles['penalty-list']}>
             {penalties.map((penalty) => (
-              <label key={penalty.id} className="penalty-row">
-                <input type="checkbox" className="penalty-checkbox" />
-                <span className="penalty-name">{penalty.name}</span>
-                <span className="penalty-amount">
+              <label key={penalty.id} className={styles['penalty-row']}>
+                <input type="checkbox" className={styles['penalty-checkbox']} />
+                <span className={styles['penalty-name']}>{penalty.name}</span>
+                <span className={styles['penalty-amount']}>
                   {penalty.amount.toLocaleString()}원
                 </span>
-                <span className="penalty-status">{penalty.status}</span>
+                <span className={styles['penalty-status']}>{penalty.status}</span>
               </label>
             ))}
           </div>
         </section>
       </section>
-
-      <nav className="bottom-nav">
-        <button type="button" className="bottom-nav-button">
-          <Calendar size={28} />
-        </button>
-
-        <button type="button" className="bottom-nav-button">
-          <User size={28} />
-        </button>
-      </nav>
+      <BottomNav active="calendar" />
     </main>
   );
 }
