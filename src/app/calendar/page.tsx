@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { DayPicker } from 'react-day-picker';
 import styles from '@/components/calendar/calendar.module.css';
 import CleaningLogModal from '../../components/calendar/CleaningLogModal';
@@ -13,28 +13,17 @@ type CleaningTask = {
   memberName: string;
 };
 
-const cleaningEvents = [
-  {
-    date: '2026-05-04',
-    tasks: [
-      { id: 1, taskName: '바닥', memberName: '이다슬' },
-      { id: 2, taskName: '빨래', memberName: '이해슬' },
-    ],
-  },
-  {
-    date: '2026-05-07',
-    tasks: [
-      { id: 3, taskName: '설거지', memberName: '이보슬' },
-      { id: 4, taskName: '빨래', memberName: '한현수' },
-    ],
-  },
-  {
-    date: '2026-05-09',
-    tasks: [
-      { id: 5, taskName: '화장실', memberName: '이세빈' },
-    ],
-  },
-];
+type CleaningEvent = {
+  date: string;
+  tasks: CleaningTask[];
+};
+
+type ScheduleResponse = {
+  id: number;
+  date: string;
+  taskName: string;
+  memberName: string;
+};
 
 const penalties = [
   { id: 1, name: '이해슬', amount: 5000, status: '정산필요' },
@@ -66,8 +55,48 @@ export default function CalendarPage() {
 
   const [month, setMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [cleaningEvents, setCleaningEvents] = useState<CleaningEvent[]>([]);
 
   const settlementDday = getSettlementDday();
+
+  useEffect(() => {
+    const year = month.getFullYear();
+    const currentMonth = month.getMonth() + 1;
+  
+    fetch(`http://localhost:8080/api/schedules?year=${year}&month=${currentMonth}`)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error('청소 일정 조회 실패');
+        }
+  
+        return res.json();
+      })
+      .then((data: ScheduleResponse[]) => {
+        const grouped: Record<string, CleaningTask[]> = {};
+  
+        data.forEach((item) => {
+          if (!grouped[item.date]) {
+            grouped[item.date] = [];
+          }
+  
+          grouped[item.date].push({
+            id: item.id,
+            taskName: item.taskName,
+            memberName: item.memberName,
+          });
+        });
+  
+        const events: CleaningEvent[] = Object.keys(grouped).map((date) => ({
+          date,
+          tasks: grouped[date],
+        }));
+  
+        setCleaningEvents(events);
+      })
+      .catch((err) => {
+        console.error('청소 일정 불러오기 실패:', err);
+      });
+  }, [month]);
 
   const getTasks = (date: Date): CleaningTask[] => {
     return cleaningEvents.find((event) => event.date === formatDate(date))?.tasks ?? [];
@@ -108,7 +137,6 @@ export default function CalendarPage() {
             weeks: styles['fresh-weeks'],
             week: styles['fresh-week'],
             outside: styles['fresh-outside'],
-            // today: styles['fresh-today'],
           }}
           formatters={{
             formatCaption: (date) =>
@@ -122,9 +150,9 @@ export default function CalendarPage() {
               const isOutside =
                 day.date.getFullYear() !== month.getFullYear() ||
                 day.date.getMonth() !== month.getMonth();
-          
+
               const isToday = formatDate(day.date) === formatDate(new Date());
-          
+
               return (
                 <td
                   {...props}
@@ -158,13 +186,10 @@ export default function CalendarPage() {
                     >
                       {String(day.date.getDate()).padStart(2, '0')}
                     </span>
-          
+
                     <span className={styles['fresh-task-list']}>
                       {tasks.map((task) => (
-                        <span
-                          key={task.id}
-                          className={styles['fresh-task']}
-                        >
+                        <span key={task.id} className={styles['fresh-task']}>
                           {task.taskName}({task.memberName})
                         </span>
                       ))}
