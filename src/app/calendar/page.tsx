@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { DayPicker } from 'react-day-picker';
 import styles from '@/components/calendar/calendar.module.css';
 import CleaningLogModal from '../../components/calendar/CleaningLogModal';
-import { useRouter } from 'next/navigation';
 import BottomNav from '../../components/ui/BottomNav';
 
 type CleaningTask = {
@@ -25,13 +24,17 @@ type ScheduleResponse = {
   memberName: string;
 };
 
-const penalties = [
-  { id: 1, name: '이해슬', amount: 5000, status: '정산필요' },
-  { id: 2, name: '한현수', amount: 5000, status: '정산필요' },
-  { id: 3, name: '이다슬', amount: 5000, status: '정산필요' },
-  { id: 4, name: '이보슬', amount: 5000, status: '정산필요' },
-  { id: 5, name: '이세빈', amount: 5000, status: '정산필요' },
-];
+type PenaltyResponse = {
+  id: number;
+  userId: number;
+  name: string;
+  amount: number;
+  adjustmentYn: 'Y' | 'N';
+  status: string;
+};
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
 
 function formatDate(date: Date) {
   const yyyy = date.getFullYear();
@@ -51,55 +54,123 @@ function getSettlementDday() {
 }
 
 export default function CalendarPage() {
-  const router = useRouter();
-
   const [month, setMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [cleaningEvents, setCleaningEvents] = useState<CleaningEvent[]>([]);
+  const [penalties, setPenalties] = useState<PenaltyResponse[]>([]);
 
   const settlementDday = getSettlementDday();
 
-  useEffect(() => {
-    const year = month.getFullYear();
-    const currentMonth = month.getMonth() + 1;
-  
-    fetch(`http://localhost:8080/api/schedules?year=${year}&month=${currentMonth}`)
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error('청소 일정 조회 실패');
+  const fetchSchedules = async () => {
+    try {
+      const year = month.getFullYear();
+      const currentMonth = month.getMonth() + 1;
+
+      const res = await fetch(
+        `${API_BASE_URL}/api/schedules?year=${year}&month=${currentMonth}`,
+        {
+          credentials: 'include',
         }
-  
-        return res.json();
-      })
-      .then((data: ScheduleResponse[]) => {
-        const grouped: Record<string, CleaningTask[]> = {};
-  
-        data.forEach((item) => {
-          if (!grouped[item.date]) {
-            grouped[item.date] = [];
-          }
-  
-          grouped[item.date].push({
-            id: item.id,
-            taskName: item.taskName,
-            memberName: item.memberName,
-          });
+      );
+
+      if (!res.ok) {
+        throw new Error('청소 일정 조회 실패');
+      }
+
+      const data: ScheduleResponse[] = await res.json();
+
+      const grouped: Record<string, CleaningTask[]> = {};
+
+      data.forEach((item) => {
+        if (!grouped[item.date]) {
+          grouped[item.date] = [];
+        }
+
+        grouped[item.date].push({
+          id: item.id,
+          taskName: item.taskName,
+          memberName: item.memberName,
         });
-  
-        const events: CleaningEvent[] = Object.keys(grouped).map((date) => ({
-          date,
-          tasks: grouped[date],
-        }));
-  
-        setCleaningEvents(events);
-      })
-      .catch((err) => {
-        console.error('청소 일정 불러오는 데 실패하였습니다.:', err);
       });
+
+      const events: CleaningEvent[] = Object.keys(grouped).map((date) => ({
+        date,
+        tasks: grouped[date],
+      }));
+
+      setCleaningEvents(events);
+    } catch (err) {
+      console.error('청소 일정 불러오는 데 실패하였습니다.:', err);
+    }
+  };
+
+  const fetchPenalties = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/penalties`, {
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        throw new Error('벌금 현황 조회 실패');
+      }
+
+      const data: PenaltyResponse[] = await res.json();
+
+      setPenalties(data);
+    } catch (err) {
+      console.error('벌금 현황 불러오는 데 실패하였습니다.:', err);
+    }
+  };
+
+  const handleTogglePenalty = async (penaltyId: number) => {
+    const targetPenalty = penalties.find((penalty) => penalty.id === penaltyId);
+
+    if (!targetPenalty) return;
+
+    const nextAdjustmentYn = targetPenalty.adjustmentYn === 'Y' ? 'N' : 'Y';
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/penalties/${penaltyId}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          adjustmentYn: nextAdjustmentYn,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('벌금 정산 여부 수정 실패');
+      }
+
+      const updatedPenalty: PenaltyResponse = await res.json();
+
+      setPenalties((prev) =>
+        prev.map((penalty) =>
+          penalty.id === penaltyId ? updatedPenalty : penalty
+        )
+      );
+    } catch (error) {
+      console.error('벌금 정산 여부 수정 실패:', error);
+      alert('벌금 정산 여부 수정에 실패했습니다.');
+    }
+  };
+
+  useEffect(() => {
+    fetchSchedules();
   }, [month]);
 
+  useEffect(() => {
+    fetchPenalties();
+  }, []);
+
   const getTasks = (date: Date): CleaningTask[] => {
-    return cleaningEvents.find((event) => event.date === formatDate(date))?.tasks ?? [];
+    return (
+      cleaningEvents.find((event) => event.date === formatDate(date))?.tasks ??
+      []
+    );
   };
 
   return (
@@ -147,6 +218,7 @@ export default function CalendarPage() {
           components={{
             Day: ({ day, ...props }) => {
               const tasks = getTasks(day.date);
+
               const isOutside =
                 day.date.getFullYear() !== month.getFullYear() ||
                 day.date.getMonth() !== month.getMonth();
@@ -213,6 +285,7 @@ export default function CalendarPage() {
             date={selectedDate}
             logs={getTasks(selectedDate)}
             onClose={() => setSelectedDate(null)}
+            onChanged={fetchSchedules}
           />
         )}
 
@@ -225,16 +298,44 @@ export default function CalendarPage() {
           </div>
 
           <div className={styles['penalty-list']}>
-            {penalties.map((penalty) => (
-              <label key={penalty.id} className={styles['penalty-row']}>
-                <input type="checkbox" className={styles['penalty-checkbox']} />
-                <span className={styles['penalty-name']}>{penalty.name}</span>
-                <span className={styles['penalty-amount']}>
-                  {penalty.amount.toLocaleString()}원
-                </span>
-                <span className={styles['penalty-status']}>{penalty.status}</span>
-              </label>
-            ))}
+            {penalties.length > 0 ? (
+              penalties.map((penalty) => (
+                <label key={penalty.id} className={styles['penalty-row']}>
+                  {isAdmin ? (
+                    <input
+                      type="checkbox"
+                      className={styles['penalty-checkbox']}
+                      checked={penalty.adjustmentYn === 'Y'}
+                      onChange={() => handleTogglePenalty(penalty.id)}
+                    />
+                  ) : (
+                    <span
+                      className={`${styles['penalty-toggle']} ${
+                        penalty.adjustmentYn === 'Y' ? styles.checked : ''
+                      }`}
+                    >
+                      <span className={styles['penalty-toggle-circle']} />
+                    </span>
+                  )}
+
+                  <span className={styles['penalty-name']}>
+                    {penalty.name}
+                  </span>
+
+                  <span className={styles['penalty-amount']}>
+                    {penalty.amount.toLocaleString()}원
+                  </span>
+
+                  <span className={styles['penalty-status']}>
+                    {penalty.status}
+                  </span>
+                </label>
+              ))
+            ) : (
+              <p className={styles['cleaning-empty']}>
+                등록된 벌금 현황이 없습니다.
+              </p>
+            )}
           </div>
         </section>
       </section>
