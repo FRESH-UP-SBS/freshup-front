@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { DayPicker } from 'react-day-picker';
 import styles from '@/components/calendar/calendar.module.css';
 import CleaningLogModal from '../../components/calendar/CleaningLogModal';
+import { useRouter } from 'next/navigation';
 import BottomNav from '../../components/ui/BottomNav';
 
 type CleaningTask = {
@@ -54,6 +55,8 @@ function getSettlementDday() {
 }
 
 export default function CalendarPage() {
+  const router = useRouter();
+
   const [month, setMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [cleaningEvents, setCleaningEvents] = useState<CleaningEvent[]>([]);
@@ -218,7 +221,6 @@ export default function CalendarPage() {
           components={{
             Day: ({ day, ...props }) => {
               const tasks = getTasks(day.date);
-
               const isOutside =
                 day.date.getFullYear() !== month.getFullYear() ||
                 day.date.getMonth() !== month.getMonth();
@@ -228,9 +230,8 @@ export default function CalendarPage() {
               return (
                 <td
                   {...props}
-                  className={`${styles['fresh-day']} ${
-                    isOutside ? styles['fresh-outside-day'] : ''
-                  }`}
+                  className={`${styles['fresh-day']} ${isOutside ? styles['fresh-outside-day'] : ''
+                    }`}
                 >
                   <button
                     type="button"
@@ -242,17 +243,17 @@ export default function CalendarPage() {
                       style={
                         isToday
                           ? {
-                              backgroundColor: '#000',
-                              color: '#fff',
-                              borderRadius: '50%',
-                              fontWeight: 600,
-                              width: '28px',
-                              height: '28px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              marginBottom: '7px',
-                            }
+                            backgroundColor: '#000',
+                            color: '#fff',
+                            borderRadius: '50%',
+                            fontWeight: 600,
+                            width: '28px',
+                            height: '28px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: '7px',
+                          }
                           : undefined
                       }
                     >
@@ -301,26 +302,14 @@ export default function CalendarPage() {
             {penalties.length > 0 ? (
               penalties.map((penalty) => (
                 <label key={penalty.id} className={styles['penalty-row']}>
-                  {isAdmin ? (
-                    <input
-                      type="checkbox"
-                      className={styles['penalty-checkbox']}
-                      checked={penalty.adjustmentYn === 'Y'}
-                      onChange={() => handleTogglePenalty(penalty.id)}
-                    />
-                  ) : (
-                    <span
-                      className={`${styles['penalty-toggle']} ${
-                        penalty.adjustmentYn === 'Y' ? styles.checked : ''
-                      }`}
-                    >
-                      <span className={styles['penalty-toggle-circle']} />
-                    </span>
-                  )}
+                  <input
+                    type="checkbox"
+                    className={styles['penalty-checkbox']}
+                    checked={penalty.adjustmentYn === 'Y'}
+                    onChange={() => handleTogglePenalty(penalty.id)}
+                  />
 
-                  <span className={styles['penalty-name']}>
-                    {penalty.name}
-                  </span>
+                  <span className={styles['penalty-name']}>{penalty.name}</span>
 
                   <span className={styles['penalty-amount']}>
                     {penalty.amount.toLocaleString()}원
