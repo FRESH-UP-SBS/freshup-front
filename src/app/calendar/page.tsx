@@ -94,7 +94,7 @@ export default function CalendarPage() {
         setCleaningEvents(events);
       })
       .catch((err) => {
-        console.error('청소 일정 불러오기 실패:', err);
+        console.error('청소 일정 불러오는 데 실패하였습니다.:', err);
       });
   }, [month]);
 
