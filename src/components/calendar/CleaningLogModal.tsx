@@ -15,14 +15,45 @@ type CleaningLogModalProps = {
   date: Date;
   logs: CleaningLog[];
   onClose: () => void;
+
+  // 추가/수정/삭제 후 부모 캘린더 데이터를 다시 불러오고 싶을 때 사용
+  onChanged?: () => void;
 };
 
-const workOptions = ['바닥', '빨래', '설거지', '화장실'];
+type WorkOption = {
+  id: number;
+  name: string;
+};
+
+// DB의 TB_WORK.WORK_SEQ 값과 맞춰야 함
+const workOptions: WorkOption[] = [
+  { id: 1, name: '바닥' },
+  { id: 2, name: '빨래' },
+  { id: 3, name: '설거지' },
+  { id: 4, name: '화장실' },
+];
+
+// 임시값
+// 나중에 로그인 유저 id로 교체해야 함
+const CURRENT_USER_ID = 1;
+
+function formatDate(date: Date) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function getWorkIdByName(workName: string) {
+  return workOptions.find((work) => work.name === workName)?.id;
+}
 
 export default function CleaningLogModal({
   date,
   logs,
   onClose,
+  onChanged,
 }: CleaningLogModalProps) {
   const [modalMode, setModalMode] = useState<'log' | 'admin'>('log');
   const [localLogs, setLocalLogs] = useState<CleaningLog[]>(logs);
@@ -37,6 +68,8 @@ export default function CleaningLogModal({
 
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+
+  const [isSaving, setIsSaving] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -83,18 +116,58 @@ export default function CleaningLogModal({
     setIsEditDropdownOpen(false);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (editingLogId === null || !editTaskName.trim()) return;
 
-    setLocalLogs((prev) =>
-      prev.map((log) =>
-        log.id === editingLogId ? { ...log, taskName: editTaskName } : log
-      )
-    );
+    const workId = getWorkIdByName(editTaskName);
 
-    setEditingLogId(null);
-    setEditTaskName('');
-    setIsEditDropdownOpen(false);
+    if (!workId) {
+      alert('업무 정보를 찾을 수 없습니다.');
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/schedules/${editingLogId}`,
+        {
+          method: 'PUT',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: CURRENT_USER_ID,
+            workId,
+            date: formatDate(date),
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        throw new Error('청소 내역 수정에 실패했습니다.');
+      }
+
+      const updatedLog: CleaningLog = await res.json();
+
+      setLocalLogs((prev) =>
+        prev.map((log) =>
+          log.id === editingLogId ? updatedLog : log
+        )
+      );
+
+      setEditingLogId(null);
+      setEditTaskName('');
+      setIsEditDropdownOpen(false);
+
+      onChanged?.();
+    } catch (error) {
+      console.error(error);
+      alert('청소 내역 수정 중 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleDeleteClick = (id: number) => {
@@ -102,17 +175,92 @@ export default function CleaningLogModal({
     setIsAlertOpen(true);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (deleteTargetId === null) return;
 
-    setLocalLogs((prev) => prev.filter((log) => log.id !== deleteTargetId));
-    setDeleteTargetId(null);
-    setIsAlertOpen(false);
+    try {
+      setIsSaving(true);
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/schedules/${deleteTargetId}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      if (!res.ok) {
+        throw new Error('청소 내역 삭제에 실패했습니다.');
+      }
+
+      setLocalLogs((prev) => prev.filter((log) => log.id !== deleteTargetId));
+
+      setDeleteTargetId(null);
+      setIsAlertOpen(false);
+
+      onChanged?.();
+    } catch (error) {
+      console.error(error);
+      alert('청소 내역 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCancelDelete = () => {
     setDeleteTargetId(null);
     setIsAlertOpen(false);
+  };
+
+  const handleCreateLog = async () => {
+    if (!selectedWork.trim()) {
+      alert('업무를 선택하세요.');
+      return;
+    }
+
+    const workId = getWorkIdByName(selectedWork);
+
+    if (!workId) {
+      alert('업무 정보를 찾을 수 없습니다.');
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/schedules`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: CURRENT_USER_ID,
+            workId,
+            date: formatDate(date),
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        throw new Error('청소 내역 등록에 실패했습니다.');
+      }
+
+      const createdLog: CleaningLog = await res.json();
+
+      setLocalLogs((prev) => [...prev, createdLog]);
+
+      setSelectedWork('');
+      setIsAddMode(false);
+      setIsWorkDropdownOpen(false);
+
+      onChanged?.();
+    } catch (error) {
+      console.error(error);
+      alert('청소 내역 등록 중 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -174,6 +322,7 @@ export default function CleaningLogModal({
                             onClick={() =>
                               setIsEditDropdownOpen((prev) => !prev)
                             }
+                            disabled={isSaving}
                           >
                             <span>{editTaskName || '업무를 선택하세요'}</span>
 
@@ -188,20 +337,20 @@ export default function CleaningLogModal({
                           {isEditDropdownOpen && (
                             <ul className={styles['cleaning-log-edit-list']}>
                               {workOptions.map((work) => (
-                                <li key={work}>
+                                <li key={work.id}>
                                   <button
                                     type="button"
                                     className={`${styles['cleaning-log-edit-option']} ${
-                                      editTaskName === work
+                                      editTaskName === work.name
                                         ? styles.selected
                                         : ''
                                     }`}
                                     onClick={() => {
-                                      setEditTaskName(work);
+                                      setEditTaskName(work.name);
                                       setIsEditDropdownOpen(false);
                                     }}
                                   >
-                                    {work}
+                                    {work.name}
                                   </button>
                                 </li>
                               ))}
@@ -220,6 +369,7 @@ export default function CleaningLogModal({
                             type="button"
                             className={styles['cleaning-action-btn']}
                             onClick={handleSaveEdit}
+                            disabled={isSaving}
                           >
                             <Check size={18} />
                           </button>
@@ -228,6 +378,7 @@ export default function CleaningLogModal({
                             type="button"
                             className={styles['cleaning-action-btn']}
                             onClick={() => handleStartEdit(log)}
+                            disabled={isSaving}
                           >
                             <Pencil size={18} />
                           </button>
@@ -237,6 +388,7 @@ export default function CleaningLogModal({
                           type="button"
                           className={`${styles['cleaning-action-btn']} ${styles.danger}`}
                           onClick={() => handleDeleteClick(log.id)}
+                          disabled={isSaving}
                         >
                           <Trash2 size={18} />
                         </button>
@@ -260,6 +412,7 @@ export default function CleaningLogModal({
                       type="button"
                       className={styles['cleaning-dropdown-button']}
                       onClick={() => setIsWorkDropdownOpen((prev) => !prev)}
+                      disabled={isSaving}
                     >
                       <span className={!selectedWork ? styles.placeholder : ''}>
                         {selectedWork || '업무를 선택하세요'}
@@ -276,18 +429,18 @@ export default function CleaningLogModal({
                     {isWorkDropdownOpen && (
                       <ul className={styles['cleaning-dropdown-list']}>
                         {workOptions.map((work) => (
-                          <li key={work}>
+                          <li key={work.id}>
                             <button
                               type="button"
                               className={`${styles['cleaning-dropdown-option']} ${
-                                selectedWork === work ? styles.selected : ''
+                                selectedWork === work.name ? styles.selected : ''
                               }`}
                               onClick={() => {
-                                setSelectedWork(work);
+                                setSelectedWork(work.name);
                                 setIsWorkDropdownOpen(false);
                               }}
                             >
-                              {work}
+                              {work.name}
                             </button>
                           </li>
                         ))}
@@ -298,6 +451,8 @@ export default function CleaningLogModal({
                   <button
                     type="button"
                     className={styles['cleaning-log-save-btn']}
+                    onClick={handleCreateLog}
+                    disabled={isSaving}
                   >
                     <Check size={22} />
                   </button>
@@ -324,6 +479,7 @@ export default function CleaningLogModal({
 
                   setIsAddMode(true);
                 }}
+                disabled={isSaving}
               >
                 <Plus size={28} />
               </button>
@@ -343,6 +499,7 @@ export default function CleaningLogModal({
                   type="button"
                   className={styles.cancel}
                   onClick={handleCancelDelete}
+                  disabled={isSaving}
                 >
                   취소
                 </button>
@@ -351,6 +508,7 @@ export default function CleaningLogModal({
                   type="button"
                   className={styles.confirm}
                   onClick={handleConfirmDelete}
+                  disabled={isSaving}
                 >
                   확인
                 </button>
