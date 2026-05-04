@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { DayPicker } from 'react-day-picker';
 import styles from '@/components/calendar/calendar.module.css';
 import CleaningLogModal from '../../components/calendar/CleaningLogModal';
-import { useRouter } from 'next/navigation';
 import BottomNav from '../../components/ui/BottomNav';
 
 type CleaningTask = {
@@ -55,8 +54,6 @@ function getSettlementDday() {
 }
 
 export default function CalendarPage() {
-  const router = useRouter();
-
   const [month, setMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [cleaningEvents, setCleaningEvents] = useState<CleaningEvent[]>([]);
@@ -221,6 +218,7 @@ export default function CalendarPage() {
           components={{
             Day: ({ day, ...props }) => {
               const tasks = getTasks(day.date);
+
               const isOutside =
                 day.date.getFullYear() !== month.getFullYear() ||
                 day.date.getMonth() !== month.getMonth();
@@ -303,14 +301,26 @@ export default function CalendarPage() {
             {penalties.length > 0 ? (
               penalties.map((penalty) => (
                 <label key={penalty.id} className={styles['penalty-row']}>
-                  <input
-                    type="checkbox"
-                    className={styles['penalty-checkbox']}
-                    checked={penalty.adjustmentYn === 'Y'}
-                    onChange={() => handleTogglePenalty(penalty.id)}
-                  />
+                  {isAdmin ? (
+                    <input
+                      type="checkbox"
+                      className={styles['penalty-checkbox']}
+                      checked={penalty.adjustmentYn === 'Y'}
+                      onChange={() => handleTogglePenalty(penalty.id)}
+                    />
+                  ) : (
+                    <span
+                      className={`${styles['penalty-toggle']} ${
+                        penalty.adjustmentYn === 'Y' ? styles.checked : ''
+                      }`}
+                    >
+                      <span className={styles['penalty-toggle-circle']} />
+                    </span>
+                  )}
 
-                  <span className={styles['penalty-name']}>{penalty.name}</span>
+                  <span className={styles['penalty-name']}>
+                    {penalty.name}
+                  </span>
 
                   <span className={styles['penalty-amount']}>
                     {penalty.amount.toLocaleString()}원
