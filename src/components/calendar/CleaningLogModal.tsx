@@ -16,7 +16,7 @@ type CleaningLogModalProps = {
   logs: CleaningLog[];
   onClose: () => void;
 
-  // 추가/수정/삭제 후 부모 캘린더 데이터를 다시 불러오고 싶을 때 사용
+  // 추가/수정/삭제 후 부모 캘린더에서 다시 조회하기 위한 함수
   onChanged?: () => void;
 };
 
@@ -25,17 +25,21 @@ type WorkOption = {
   name: string;
 };
 
-// DB의 TB_WORK.WORK_SEQ 값과 맞춰야 함
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
+
+// 임시 로그인 사용자 ID
+// 현재 TB_USER 기준 이세빈 USER_SEQ = 1
+const CURRENT_USER_ID = 1;
+
+// 기존 UI 유지용 업무 목록
+// TB_WORK.WORK_SEQ와 반드시 맞아야 함
 const workOptions: WorkOption[] = [
   { id: 1, name: '바닥' },
   { id: 2, name: '빨래' },
   { id: 3, name: '설거지' },
   { id: 4, name: '화장실' },
 ];
-
-// 임시값
-// 나중에 로그인 유저 id로 교체해야 함
-const CURRENT_USER_ID = 1;
 
 function formatDate(date: Date) {
   const yyyy = date.getFullYear();
@@ -47,6 +51,16 @@ function formatDate(date: Date) {
 
 function getWorkIdByName(workName: string) {
   return workOptions.find((work) => work.name === workName)?.id;
+}
+
+async function getErrorMessage(res: Response) {
+  const text = await res.text();
+
+  if (!text) {
+    return `상태코드: ${res.status}`;
+  }
+
+  return text;
 }
 
 export default function CleaningLogModal({
@@ -72,6 +86,7 @@ export default function CleaningLogModal({
   const [isSaving, setIsSaving] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const editDropdownRef = useRef<HTMLDivElement>(null);
 
   const month = date.getMonth() + 1;
   const day = date.getDate();
@@ -82,16 +97,25 @@ export default function CleaningLogModal({
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
+      const target = e.target as Node;
+
+      if (dropdownRef.current && !dropdownRef.current.contains(target)) {
         setIsWorkDropdownOpen(false);
+      }
+
+      if (
+        editDropdownRef.current &&
+        !editDropdownRef.current.contains(target)
+      ) {
+        setIsEditDropdownOpen(false);
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
   const handleChangeAdminMode = () => {
@@ -99,6 +123,7 @@ export default function CleaningLogModal({
     setIsAddMode(false);
     setIsWorkDropdownOpen(false);
     setEditingLogId(null);
+    setEditTaskName('');
     setIsEditDropdownOpen(false);
   };
 
@@ -117,7 +142,9 @@ export default function CleaningLogModal({
   };
 
   const handleSaveEdit = async () => {
-    if (editingLogId === null || !editTaskName.trim()) return;
+    if (editingLogId === null || !editTaskName.trim()) {
+      return;
+    }
 
     const workId = getWorkIdByName(editTaskName);
 
@@ -129,32 +156,30 @@ export default function CleaningLogModal({
     try {
       setIsSaving(true);
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/schedules/${editingLogId}`,
-        {
-          method: 'PUT',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            userId: CURRENT_USER_ID,
-            workId,
-            date: formatDate(date),
-          }),
-        }
-      );
+      const res = await fetch(`${API_BASE_URL}/api/schedules/${editingLogId}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: CURRENT_USER_ID,
+          workId,
+          date: formatDate(date),
+        }),
+      });
 
       if (!res.ok) {
-        throw new Error('청소 내역 수정에 실패했습니다.');
+        const errorMessage = await getErrorMessage(res);
+        console.error('청소 내역 수정 실패:', errorMessage);
+        alert('청소 내역 수정에 실패했습니다.');
+        return;
       }
 
       const updatedLog: CleaningLog = await res.json();
 
       setLocalLogs((prev) =>
-        prev.map((log) =>
-          log.id === editingLogId ? updatedLog : log
-        )
+        prev.map((log) => (log.id === editingLogId ? updatedLog : log))
       );
 
       setEditingLogId(null);
@@ -163,7 +188,7 @@ export default function CleaningLogModal({
 
       onChanged?.();
     } catch (error) {
-      console.error(error);
+      console.error('청소 내역 수정 중 오류:', error);
       alert('청소 내역 수정 중 오류가 발생했습니다.');
     } finally {
       setIsSaving(false);
@@ -176,20 +201,23 @@ export default function CleaningLogModal({
   };
 
   const handleConfirmDelete = async () => {
-    if (deleteTargetId === null) return;
+    if (deleteTargetId === null) {
+      return;
+    }
 
     try {
       setIsSaving(true);
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/schedules/${deleteTargetId}`,
-        {
-          method: 'DELETE',
-        }
-      );
+      const res = await fetch(`${API_BASE_URL}/api/schedules/${deleteTargetId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
 
       if (!res.ok) {
-        throw new Error('청소 내역 삭제에 실패했습니다.');
+        const errorMessage = await getErrorMessage(res);
+        console.error('청소 내역 삭제 실패:', errorMessage);
+        alert('청소 내역 삭제에 실패했습니다.');
+        return;
       }
 
       setLocalLogs((prev) => prev.filter((log) => log.id !== deleteTargetId));
@@ -199,7 +227,7 @@ export default function CleaningLogModal({
 
       onChanged?.();
     } catch (error) {
-      console.error(error);
+      console.error('청소 내역 삭제 중 오류:', error);
       alert('청소 내역 삭제 중 오류가 발생했습니다.');
     } finally {
       setIsSaving(false);
@@ -227,23 +255,24 @@ export default function CleaningLogModal({
     try {
       setIsSaving(true);
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/schedules`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            userId: CURRENT_USER_ID,
-            workId,
-            date: formatDate(date),
-          }),
-        }
-      );
+      const res = await fetch(`${API_BASE_URL}/api/schedules`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: CURRENT_USER_ID,
+          workId,
+          date: formatDate(date),
+        }),
+      });
 
       if (!res.ok) {
-        throw new Error('청소 내역 등록에 실패했습니다.');
+        const errorMessage = await getErrorMessage(res);
+        console.error('청소 내역 등록 실패:', errorMessage);
+        alert('청소 내역 등록에 실패했습니다.');
+        return;
       }
 
       const createdLog: CleaningLog = await res.json();
@@ -256,7 +285,7 @@ export default function CleaningLogModal({
 
       onChanged?.();
     } catch (error) {
-      console.error(error);
+      console.error('청소 내역 등록 중 오류:', error);
       alert('청소 내역 등록 중 오류가 발생했습니다.');
     } finally {
       setIsSaving(false);
@@ -282,6 +311,7 @@ export default function CleaningLogModal({
                 type="button"
                 className={styles['cleaning-admin-btn']}
                 onClick={handleChangeAdminMode}
+                disabled={isSaving}
               >
                 Admin Mode
               </button>
@@ -292,6 +322,7 @@ export default function CleaningLogModal({
                 type="button"
                 className={styles['cleaning-admin-btn']}
                 onClick={handleChangeLogMode}
+                disabled={isSaving}
               >
                 Schedule Mode
               </button>
@@ -301,6 +332,7 @@ export default function CleaningLogModal({
               type="button"
               className={styles['cleaning-close-btn']}
               onClick={onClose}
+              disabled={isSaving}
             >
               <X size={22} />
             </button>
@@ -315,7 +347,10 @@ export default function CleaningLogModal({
                   localLogs.map((log) => (
                     <div key={log.id} className={styles['cleaning-log-row']}>
                       {editingLogId === log.id ? (
-                        <div className={styles['cleaning-log-edit-wrap']}>
+                        <div
+                          className={styles['cleaning-log-edit-wrap']}
+                          ref={editDropdownRef}
+                        >
                           <button
                             type="button"
                             className={styles['cleaning-log-edit-button']}
@@ -349,6 +384,7 @@ export default function CleaningLogModal({
                                       setEditTaskName(work.name);
                                       setIsEditDropdownOpen(false);
                                     }}
+                                    disabled={isSaving}
                                   >
                                     {work.name}
                                   </button>
@@ -439,6 +475,7 @@ export default function CleaningLogModal({
                                 setSelectedWork(work.name);
                                 setIsWorkDropdownOpen(false);
                               }}
+                              disabled={isSaving}
                             >
                               {work.name}
                             </button>
@@ -467,6 +504,10 @@ export default function CleaningLogModal({
                     : ''
                 }`}
                 onClick={() => {
+                  if (isSaving) {
+                    return;
+                  }
+
                   if (isAddMode || editingLogId !== null) {
                     setIsAddMode(false);
                     setEditingLogId(null);

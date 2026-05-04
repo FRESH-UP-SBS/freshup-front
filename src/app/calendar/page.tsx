@@ -33,12 +33,6 @@ type PenaltyResponse = {
   status: string;
 };
 
-type CurrentUserResponse = {
-  id: number;
-  name: string;
-  role: 'ADMIN' | 'USER';
-};
-
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
 
@@ -64,8 +58,6 @@ export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [cleaningEvents, setCleaningEvents] = useState<CleaningEvent[]>([]);
   const [penalties, setPenalties] = useState<PenaltyResponse[]>([]);
-
-  const [isAdmin, setIsAdmin] = useState(true);
 
   const settlementDday = getSettlementDday();
 
@@ -130,28 +122,7 @@ export default function CalendarPage() {
     }
   };
 
-  const fetchCurrentUser = async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/users/me`, {
-        credentials: 'include',
-      });
-
-      if (!res.ok) {
-        throw new Error('사용자 정보 조회 실패');
-      }
-
-      const data: CurrentUserResponse = await res.json();
-
-      setIsAdmin(data.role === 'ADMIN');
-    } catch (err) {
-      console.error('사용자 정보 조회 실패:', err);
-      setIsAdmin(false);
-    }
-  };
-
   const handleTogglePenalty = async (penaltyId: number) => {
-    if (!isAdmin) return;
-
     const targetPenalty = penalties.find((penalty) => penalty.id === penaltyId);
 
     if (!targetPenalty) return;
@@ -192,7 +163,6 @@ export default function CalendarPage() {
   }, [month]);
 
   useEffect(() => {
-    //fetchCurrentUser();
     fetchPenalties();
   }, []);
 
