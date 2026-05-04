@@ -15,21 +15,21 @@ type CleaningTask = {
 
 const cleaningEvents = [
   {
-    date: '2026-04-21',
+    date: '2026-05-04',
     tasks: [
       { id: 1, taskName: '바닥', memberName: '이다슬' },
       { id: 2, taskName: '빨래', memberName: '이해슬' },
     ],
   },
   {
-    date: '2026-04-23',
+    date: '2026-05-07',
     tasks: [
       { id: 3, taskName: '설거지', memberName: '이보슬' },
       { id: 4, taskName: '빨래', memberName: '한현수' },
     ],
   },
   {
-    date: '2026-04-24',
+    date: '2026-05-09',
     tasks: [
       { id: 5, taskName: '화장실', memberName: '이세빈' },
     ],
@@ -62,9 +62,9 @@ function getSettlementDday() {
 }
 
 export default function CalendarPage() {
-  const router = useRouter(); // ✅ 추가
+  const router = useRouter();
 
-  const [month, setMonth] = useState(new Date(2026, 3, 1));
+  const [month, setMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   const settlementDday = getSettlementDday();
@@ -108,7 +108,7 @@ export default function CalendarPage() {
             weeks: styles['fresh-weeks'],
             week: styles['fresh-week'],
             outside: styles['fresh-outside'],
-            today: styles['fresh-today'],
+            // today: styles['fresh-today'],
           }}
           formatters={{
             formatCaption: (date) =>
@@ -119,11 +119,12 @@ export default function CalendarPage() {
           components={{
             Day: ({ day, ...props }) => {
               const tasks = getTasks(day.date);
-
               const isOutside =
                 day.date.getFullYear() !== month.getFullYear() ||
                 day.date.getMonth() !== month.getMonth();
-
+          
+              const isToday = formatDate(day.date) === formatDate(new Date());
+          
               return (
                 <td
                   {...props}
@@ -136,13 +137,34 @@ export default function CalendarPage() {
                     className={styles['fresh-day-button']}
                     onClick={() => setSelectedDate(day.date)}
                   >
-                    <span className={styles['fresh-day-number']}>
+                    <span
+                      className={styles['fresh-day-number']}
+                      style={
+                        isToday
+                          ? {
+                              backgroundColor: '#000',
+                              color: '#fff',
+                              borderRadius: '50%',
+                              fontWeight: 600,
+                              width: '28px',
+                              height: '28px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginBottom: '7px',
+                            }
+                          : undefined
+                      }
+                    >
                       {String(day.date.getDate()).padStart(2, '0')}
                     </span>
-
+          
                     <span className={styles['fresh-task-list']}>
                       {tasks.map((task) => (
-                        <span key={task.id} className={styles['fresh-task']}>
+                        <span
+                          key={task.id}
+                          className={styles['fresh-task']}
+                        >
                           {task.taskName}({task.memberName})
                         </span>
                       ))}
@@ -191,6 +213,7 @@ export default function CalendarPage() {
           </div>
         </section>
       </section>
+
       <BottomNav active="calendar" />
     </main>
   );
