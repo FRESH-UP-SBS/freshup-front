@@ -5,7 +5,7 @@ import BottomNav from '@/components/ui/BottomNav';
 import styles from './MyPage.module.css';
 
 type MyPageStatsResponse = {
-  userId: number;
+  userSeq: number;
   name: string;
   role: 'ADMIN' | 'USER';
   weeklyCleanCount: number;
@@ -17,10 +17,6 @@ type MyPageStatsResponse = {
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
 
-// 임시 로그인 사용자 ID
-// 현재 TB_USER 기준 이세빈 USER_SEQ = 1
-const CURRENT_USER_ID = 1;
-
 export default function MyPage() {
   const [stats, setStats] = useState<MyPageStatsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -29,12 +25,14 @@ export default function MyPage() {
     try {
       setIsLoading(true);
 
-      const res = await fetch(
-        `${API_BASE_URL}/api/user-stats/${CURRENT_USER_ID}`,
-        {
-          credentials: 'include',
-        }
-      );
+      const res = await fetch(`${API_BASE_URL}/api/user-stats/me`, {
+        credentials: 'include',
+      });
+
+      if (res.status === 401) {
+        window.location.href = `${API_BASE_URL}/oauth2/authorization/kakao`;
+        return;
+      }
 
       if (!res.ok) {
         throw new Error('마이페이지 정보 조회 실패');
@@ -45,6 +43,7 @@ export default function MyPage() {
       setStats(data);
     } catch (error) {
       console.error('마이페이지 정보 조회 실패:', error);
+      setStats(null);
     } finally {
       setIsLoading(false);
     }
@@ -85,7 +84,9 @@ export default function MyPage() {
 
                 <div className={styles.infoItem}>
                   <span>총 벌금</span>
-                  <strong>{stats.totalPenaltyAmount.toLocaleString()}원</strong>
+                  <strong>
+                    {stats.totalPenaltyAmount.toLocaleString()}원
+                  </strong>
                 </div>
 
                 <div className={styles.infoItem}>

@@ -34,6 +34,13 @@ type PenaltyResponse = {
   status: string;
 };
 
+type CurrentUserResponse = {
+  id?: number;
+  userSeq?: number;
+  name: string;
+  role: 'ADMIN' | 'USER';
+};
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
 
@@ -61,8 +68,31 @@ export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [cleaningEvents, setCleaningEvents] = useState<CleaningEvent[]>([]);
   const [penalties, setPenalties] = useState<PenaltyResponse[]>([]);
+  const [currentUser, setCurrentUser] = useState<CurrentUserResponse | null>(
+    null
+  );
 
   const settlementDday = getSettlementDday();
+  const isAdmin = currentUser?.role === 'ADMIN';
+
+  const fetchCurrentUser = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/users/me`, {
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        throw new Error('현재 사용자 조회 실패');
+      }
+
+      const data: CurrentUserResponse = await res.json();
+
+      setCurrentUser(data);
+    } catch (err) {
+      console.error('현재 사용자 조회 실패:', err);
+      setCurrentUser(null);
+    }
+  };
 
   const fetchSchedules = async () => {
     try {
@@ -166,6 +196,7 @@ export default function CalendarPage() {
   }, [month]);
 
   useEffect(() => {
+    fetchCurrentUser();
     fetchPenalties();
   }, []);
 
@@ -230,8 +261,9 @@ export default function CalendarPage() {
               return (
                 <td
                   {...props}
-                  className={`${styles['fresh-day']} ${isOutside ? styles['fresh-outside-day'] : ''
-                    }`}
+                  className={`${styles['fresh-day']} ${
+                    isOutside ? styles['fresh-outside-day'] : ''
+                  }`}
                 >
                   <button
                     type="button"
@@ -243,17 +275,17 @@ export default function CalendarPage() {
                       style={
                         isToday
                           ? {
-                            backgroundColor: '#000',
-                            color: '#fff',
-                            borderRadius: '50%',
-                            fontWeight: 600,
-                            width: '28px',
-                            height: '28px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            marginBottom: '7px',
-                          }
+                              backgroundColor: '#000',
+                              color: '#fff',
+                              borderRadius: '50%',
+                              fontWeight: 600,
+                              width: '28px',
+                              height: '28px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginBottom: '7px',
+                            }
                           : undefined
                       }
                     >
@@ -302,12 +334,48 @@ export default function CalendarPage() {
             {penalties.length > 0 ? (
               penalties.map((penalty) => (
                 <label key={penalty.id} className={styles['penalty-row']}>
-                  <input
-                    type="checkbox"
-                    className={styles['penalty-checkbox']}
-                    checked={penalty.adjustmentYn === 'Y'}
-                    onChange={() => handleTogglePenalty(penalty.id)}
-                  />
+                  {isAdmin ? (
+                    <input
+                      type="checkbox"
+                      className={styles['penalty-checkbox']}
+                      checked={penalty.adjustmentYn === 'Y'}
+                      onChange={() => handleTogglePenalty(penalty.id)}
+                    />
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: '38px',
+                        height: '22px',
+                        borderRadius: '999px',
+                        border: `2px solid ${
+                          penalty.adjustmentYn === 'Y' ? '#000' : '#999'
+                        }`,
+                        backgroundColor:
+                          penalty.adjustmentYn === 'Y' ? '#000' : '#fff',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        padding: '2px',
+                        boxSizing: 'border-box',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: '14px',
+                          height: '14px',
+                          borderRadius: '50%',
+                          backgroundColor:
+                            penalty.adjustmentYn === 'Y' ? '#fff' : '#999',
+                          transform:
+                            penalty.adjustmentYn === 'Y'
+                              ? 'translateX(16px)'
+                              : 'translateX(0)',
+                          transition: 'transform 0.2s ease',
+                        }}
+                      />
+                    </span>
+                  )}
 
                   <span className={styles['penalty-name']}>{penalty.name}</span>
 
