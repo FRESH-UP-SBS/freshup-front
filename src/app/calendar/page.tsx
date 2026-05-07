@@ -261,9 +261,8 @@ export default function CalendarPage() {
               return (
                 <td
                   {...props}
-                  className={`${styles['fresh-day']} ${
-                    isOutside ? styles['fresh-outside-day'] : ''
-                  }`}
+                  className={`${styles['fresh-day']} ${isOutside ? styles['fresh-outside-day'] : ''
+                    }`}
                 >
                   <button
                     type="button"
@@ -275,17 +274,17 @@ export default function CalendarPage() {
                       style={
                         isToday
                           ? {
-                              backgroundColor: '#000',
-                              color: '#fff',
-                              borderRadius: '50%',
-                              fontWeight: 600,
-                              width: '28px',
-                              height: '28px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              marginBottom: '7px',
-                            }
+                            backgroundColor: '#000',
+                            color: '#fff',
+                            borderRadius: '50%',
+                            fontWeight: 600,
+                            width: '28px',
+                            height: '28px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: '7px',
+                          }
                           : undefined
                       }
                     >
@@ -343,38 +342,13 @@ export default function CalendarPage() {
                     />
                   ) : (
                     <span
-                      aria-hidden="true"
                       style={{
-                        width: '38px',
-                        height: '22px',
-                        borderRadius: '999px',
-                        border: `2px solid ${
-                          penalty.adjustmentYn === 'Y' ? '#000' : '#999'
-                        }`,
-                        backgroundColor:
-                          penalty.adjustmentYn === 'Y' ? '#000' : '#fff',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        padding: '2px',
-                        boxSizing: 'border-box',
-                        flexShrink: 0,
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: '#000',
                       }}
-                    >
-                      <span
-                        style={{
-                          width: '14px',
-                          height: '14px',
-                          borderRadius: '50%',
-                          backgroundColor:
-                            penalty.adjustmentYn === 'Y' ? '#fff' : '#999',
-                          transform:
-                            penalty.adjustmentYn === 'Y'
-                              ? 'translateX(16px)'
-                              : 'translateX(0)',
-                          transition: 'transform 0.2s ease',
-                        }}
-                      />
-                    </span>
+                    />
                   )}
 
                   <span className={styles['penalty-name']}>{penalty.name}</span>
