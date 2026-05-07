@@ -14,6 +14,7 @@ type AdminTask = {
 type WorkResponse = {
   id: number;
   workName: string;
+  memberIds?: number[];
   memberNames?: string[];
 };
 
@@ -21,15 +22,6 @@ type MemberOption = {
   id: number;
   name: string;
 };
-
-// 현재 DB의 TB_USER 기준
-const memberOptions: MemberOption[] = [
-  { id: 1, name: '이세빈' },
-  { id: 2, name: '이해슬' },
-  { id: 3, name: '이다슬' },
-  { id: 5, name: '한현수' },
-  { id: 93, name: '이보슬' },
-];
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
@@ -44,31 +36,21 @@ async function getErrorMessage(res: Response) {
   return text;
 }
 
-function getMemberIdsByNames(memberNames: string[] = []) {
-  return memberNames
-    .map((name) => memberOptions.find((member) => member.name === name)?.id)
-    .filter((id): id is number => id !== undefined);
-}
-
-function getMemberNamesByIds(memberIds: number[]) {
-  return memberIds
-    .map((id) => memberOptions.find((member) => member.id === id)?.name)
-    .filter((name): name is string => Boolean(name));
-}
-
 function mapWorkToAdminTask(work: WorkResponse): AdminTask {
+  const memberIds = work.memberIds ?? [];
   const memberNames = work.memberNames ?? [];
 
   return {
     id: work.id,
     taskName: work.workName,
     memberName: memberNames.join(', '),
-    memberIds: getMemberIdsByNames(memberNames),
+    memberIds,
   };
 }
 
 export default function CleaningTaskAdminModal() {
   const [tasks, setTasks] = useState<AdminTask[]>([]);
+  const [memberOptions, setMemberOptions] = useState<MemberOption[]>([]);
 
   const [taskName, setTaskName] = useState('');
   const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
@@ -85,22 +67,26 @@ export default function CleaningTaskAdminModal() {
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
-        setIsMemberOpen(false);
+  const fetchMembers = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/users`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        const errorMessage = await getErrorMessage(res);
+        console.error('회원 목록 조회 실패:', errorMessage);
+        return;
       }
-    };
 
-    document.addEventListener('mousedown', handleClickOutside);
+      const data: MemberOption[] = await res.json();
 
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
+      setMemberOptions(data);
+    } catch (error) {
+      console.error('회원 목록 조회 중 오류:', error);
+    }
+  };
 
   const fetchWorks = async () => {
     try {
@@ -131,7 +117,25 @@ export default function CleaningTaskAdminModal() {
   };
 
   useEffect(() => {
+    fetchMembers();
     fetchWorks();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
+        setIsMemberOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
   const resetForm = () => {
@@ -151,7 +155,9 @@ export default function CleaningTaskAdminModal() {
   };
 
   const getSelectedMemberText = () => {
-    const names = getMemberNamesByIds(selectedMemberIds);
+    const names = selectedMemberIds
+      .map((id) => memberOptions.find((member) => member.id === id)?.name)
+      .filter((name): name is string => Boolean(name));
 
     return names.length > 0 ? names.join(', ') : '담당자 선택';
   };
@@ -189,10 +195,7 @@ export default function CleaningTaskAdminModal() {
         return;
       }
 
-      const createdWork: WorkResponse = await res.json();
-
-      setTasks((prev) => [...prev, mapWorkToAdminTask(createdWork)]);
-
+      await fetchWorks();
       resetForm();
     } catch (error) {
       console.error('청소 업무 추가 중 오류:', error);
@@ -245,14 +248,7 @@ export default function CleaningTaskAdminModal() {
         return;
       }
 
-      const updatedWork: WorkResponse = await res.json();
-
-      setTasks((prev) =>
-        prev.map((task) =>
-          task.id === editingTaskId ? mapWorkToAdminTask(updatedWork) : task
-        )
-      );
-
+      await fetchWorks();
       resetForm();
     } catch (error) {
       console.error('청소 업무 수정 중 오류:', error);
@@ -294,7 +290,7 @@ export default function CleaningTaskAdminModal() {
         return;
       }
 
-      setTasks((prev) => prev.filter((task) => task.id !== deleteTargetId));
+      await fetchWorks();
 
       setDeleteTargetId(null);
       setIsAlertOpen(false);

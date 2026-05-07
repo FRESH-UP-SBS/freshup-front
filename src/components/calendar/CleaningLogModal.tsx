@@ -25,12 +25,15 @@ type WorkOption = {
   name: string;
 };
 
+type CurrentUserResponse = {
+  id?: number;
+  userSeq: number;
+  name: string;
+  role: 'ADMIN' | 'USER';
+};
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
-
-// 임시 로그인 사용자 ID
-// 현재 TB_USER 기준 이세빈 USER_SEQ = 1
-const CURRENT_USER_ID = 1;
 
 // 기존 UI 유지용 업무 목록
 // TB_WORK.WORK_SEQ와 반드시 맞아야 함
@@ -72,6 +75,10 @@ export default function CleaningLogModal({
   const [modalMode, setModalMode] = useState<'log' | 'admin'>('log');
   const [localLogs, setLocalLogs] = useState<CleaningLog[]>(logs);
 
+  const [currentUser, setCurrentUser] = useState<CurrentUserResponse | null>(
+    null
+  );
+
   const [isAddMode, setIsAddMode] = useState(false);
   const [selectedWork, setSelectedWork] = useState('');
   const [isWorkDropdownOpen, setIsWorkDropdownOpen] = useState(false);
@@ -90,6 +97,31 @@ export default function CleaningLogModal({
 
   const month = date.getMonth() + 1;
   const day = date.getDate();
+
+  const fetchCurrentUser = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/users/me`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        const errorMessage = await getErrorMessage(res);
+        console.error('현재 로그인 사용자 조회 실패:', errorMessage);
+        return;
+      }
+
+      const data: CurrentUserResponse = await res.json();
+
+      setCurrentUser(data);
+    } catch (error) {
+      console.error('현재 로그인 사용자 조회 중 오류:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchCurrentUser();
+  }, []);
 
   useEffect(() => {
     setLocalLogs(logs);
@@ -146,6 +178,11 @@ export default function CleaningLogModal({
       return;
     }
 
+    if (!currentUser) {
+      alert('로그인 사용자 정보를 불러오지 못했습니다.');
+      return;
+    }
+
     const workId = getWorkIdByName(editTaskName);
 
     if (!workId) {
@@ -163,7 +200,7 @@ export default function CleaningLogModal({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId: CURRENT_USER_ID,
+          userId: currentUser.userSeq,
           workId,
           date: formatDate(date),
         }),
@@ -245,6 +282,11 @@ export default function CleaningLogModal({
       return;
     }
 
+    if (!currentUser) {
+      alert('로그인 사용자 정보를 불러오지 못했습니다.');
+      return;
+    }
+
     const workId = getWorkIdByName(selectedWork);
 
     if (!workId) {
@@ -262,7 +304,7 @@ export default function CleaningLogModal({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId: CURRENT_USER_ID,
+          userId: currentUser.userSeq,
           workId,
           date: formatDate(date),
         }),
