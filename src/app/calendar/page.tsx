@@ -598,60 +598,60 @@ export default function CalendarPage() {
                         borderRadius: '50%',
                         backgroundColor: '#000',
                       }}
-                    />
+                    >
                       {/* 토글 안의 동그란 버튼처럼 보이는 부분이다. */}
-                  <span
-                    style={{
-                      width: '14px',
-                      height: '14px',
-                      borderRadius: '50%',
-                      backgroundColor:
-                        penalty.adjustmentYn === 'Y' ? '#fff' : '#999',
+                      <span
+                        style={{
+                          width: '14px',
+                          height: '14px',
+                          borderRadius: '50%',
+                          backgroundColor:
+                            penalty.adjustmentYn === 'Y' ? '#fff' : '#999',
 
-                      // 정산 완료 Y이면 오른쪽으로 이동하고,
-                      // 정산 필요 N이면 왼쪽에 둔다.
-                      transform:
-                        penalty.adjustmentYn === 'Y'
-                          ? 'translateX(16px)'
-                          : 'translateX(0)',
+                          // 정산 완료 Y이면 오른쪽으로 이동하고,
+                          // 정산 필요 N이면 왼쪽에 둔다.
+                          transform:
+                            penalty.adjustmentYn === 'Y'
+                              ? 'translateX(16px)'
+                              : 'translateX(0)',
 
-                      // 토글 위치가 바뀔 때 부드럽게 움직이도록 한다.
-                      transition: 'transform 0.2s ease',
-                    }}
-                  />
-                </span>
-              )}
+                          // 토글 위치가 바뀔 때 부드럽게 움직이도록 한다.
+                          transition: 'transform 0.2s ease',
+                        }}
+                      />
+                    </span>
+                  )}
 
-            {/* 벌금 대상 사용자 이름을 표시한다. */}
-            <span className={styles['penalty-name']}>{penalty.name}</span>
+                  {/* 벌금 대상 사용자 이름을 표시한다. */}
+                  <span className={styles['penalty-name']}>{penalty.name}</span>
 
-            {/* 벌금 금액을 표시한다.
+                  {/* 벌금 금액을 표시한다.
                       toLocaleString()은 숫자에 콤마를 넣어준다.
                       예: 10000 → 10,000 */}
-            <span className={styles['penalty-amount']}>
-              {penalty.amount.toLocaleString()}원
-            </span>
+                  <span className={styles['penalty-amount']}>
+                    {penalty.amount.toLocaleString()}원
+                  </span>
 
-            {/* 벌금 정산 상태 문구를 표시한다.
+                  {/* 벌금 정산 상태 문구를 표시한다.
                       예: 정산완료, 정산필요 */}
-            <span className={styles['penalty-status']}>
-              {penalty.status}
-            </span>
-          </label>
-          ))
-          ) : (
-          // 벌금 데이터가 없으면 안내 문구를 보여준다.
-          <p className={styles['cleaning-empty']}>
-            등록된 벌금 현황이 없습니다.
-          </p>
+                  <span className={styles['penalty-status']}>
+                    {penalty.status}
+                  </span>
+                </label>
+              ))
+            ) : (
+              // 벌금 데이터가 없으면 안내 문구를 보여준다.
+              <p className={styles['cleaning-empty']}>
+                등록된 벌금 현황이 없습니다.
+              </p>
             )}
-        </div>
+          </div>
+        </section>
       </section>
-    </section>
 
       {/* 하단 네비게이션이다.
           active="calendar"는 현재 선택된 메뉴가 calendar라는 의미이다. */}
-  <BottomNav active="calendar" />
+      <BottomNav active="calendar" />
     </main >
   );
 }
