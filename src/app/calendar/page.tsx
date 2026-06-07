@@ -556,11 +556,12 @@ export default function CalendarPage() {
         {/* 벌금 현황 영역이다. */}
         <section className={styles['penalty-section']}>
           {/* 벌금 영역 상단 제목 부분이다. */}
-          <div className={styles['penalty-header']}>
+          <div className={styles['penalty-header']} onClick={() => router.push('/penalty/list')}>
             <h2>Penalty</h2>
 
             {/* 더보기 버튼처럼 보이는 버튼이다.
                 현재 코드에서는 클릭 기능은 따로 없다. */}
+            {/* 더보기 버튼을 클릭하면 벌금 현황 페이지로 이동한다. */}
             <button type="button" className={styles['penalty-more-btn']}>
               ›
             </button>
