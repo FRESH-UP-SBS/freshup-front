@@ -1,11 +1,22 @@
 'use client';
 import styles from '@/components/calendar/calendar.module.css';
 import BottomNav from '@/components/ui/BottomNav';
+import { getCurrentUser } from '@/lib/api/users.client';
 import { useQuery } from '@tanstack/react-query';
+import { filterAndSortList } from 'next/dist/build/utils';
 import { useEffect, useState } from 'react';
-import { Button, Radio, RadioGroup, CheckPicker } from 'rsuite';
+import { Button, Radio, RadioGroup, CheckPicker, SelectPicker, DateRangePicker } from 'rsuite';
+import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 
 
+
+type PageResponse<T> = {
+    content: T[];
+    totalPages: number;
+    totalElements: number;
+    size: number;
+    number: number;
+};
 
 
 type PenaltyResponse = {
@@ -24,9 +35,19 @@ type CurrentUserResponse = {
     role: 'ADMIN' | 'USER';
 };
 
+// 벌금 현황 페이지에서 사용할 담당자 옵션 타입
 type MemberOption = {
-    value: string;
+    value: number;
     label: string;
+};
+
+// 벌금 현황 페이지에서 사용할 필터 상태 타입 
+type FilterState = {
+    assignees: number[];       // 담당자 (다중 선택)
+    paymentStatus: string;     // 수납 여부
+    dateRange: [Date, Date] | null;  // 날짜 범위
+    size?: number;           // 페이지당 항목 수
+    page?: number;           // 현재 페이지 번호
 };
 const API_BASE_URL =
     process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
@@ -39,45 +60,53 @@ export default function PenaltyListPage() {
     // role이 ADMIN이면 true, 아니면 false이다.
     const isAdmin = currentUser?.role === 'ADMIN';
     // 현재 로그인한 사용자 정보를 백엔드에서 가져오는 함수이다.
+
     const fetchCurrentUser = async () => {
-        try {
-            // 현재 로그인한 사용자 정보를 요청한다.
-            //
-            // credentials: 'include'는
-            // 쿠키 기반 로그인 정보를 요청에 포함시키기 위해 사용한다.
-            const res = await fetch(`${API_BASE_URL}/api/users/me`, {
-                credentials: 'include',
-            });
-
-            // 응답이 정상 범위가 아니면 에러를 발생시킨다.
-            if (!res.ok) {
-                throw new Error('현재 사용자 조회 실패');
-            }
-
-            // 응답 JSON을 CurrentUserResponse 타입으로 변환한다.
-            const data: CurrentUserResponse = await res.json();
-
-            // 가져온 사용자 정보를 상태에 저장한다.
-            setCurrentUser(data);
-        } catch (err) {
-            // 사용자 정보 조회에 실패하면 콘솔에 에러를 출력한다.
-            console.error('현재 사용자 조회 실패:', err);
-
-            // 사용자 정보를 null로 설정한다.
-            setCurrentUser(null);
-        }
+        const currentUser = await getCurrentUser() as CurrentUserResponse;
+        setCurrentUser(currentUser);
     };
 
     // 벌금 현황 목록을 상태로 관리한다.
     const [penalties, setPenalties] = useState<PenaltyResponse[]>([]);
-    const query = new URLSearchParams();
+
+    // 페이지네이션을 위한 상태
+    const [totalPages, setTotalPages] = useState(1);
+    const [currentPage, setCurrentPage] = useState(0);
+
+
+    // 필터 상태를 관리하는 useState 훅
+    const [filters, setFilters] = useState<FilterState>({
+        assignees: [],
+        paymentStatus: 'ALL',
+        dateRange: new Date() === null ? null : [new Date(new Date().setDate(new Date().getDate() - 60)), new Date()], // 초기값을 한달 전 ~ 오늘 날짜로 설정
+        size: 10,
+        page: 0,
+    });
 
 
     // 벌금 현황 목록을 백엔드에서 가져오는 함수이다.
-    const fetchPenalties = async () => {
+    const fetchPenalties = async (filters: FilterState, page: number = 0) => {
+
         try {
+            // 쿼리 파라미터를 생성 start !! 
+            const params = new URLSearchParams();
+            if (filters.assignees.length > 0) {
+                filters.assignees.forEach(id => params.append('assignees', String(id)));
+            }
+            if (filters.paymentStatus !== 'ALL') {
+                params.append('paymentStatus', filters.paymentStatus);
+            }
+            if (filters.dateRange) {
+                params.append('startDate', filters.dateRange[0].toISOString().split('T')[0]);
+                params.append('endDate', filters.dateRange[1].toISOString().split('T')[0]);
+            }
+            // 페이지네이션을 위한 쿼리 파라미터 추가
+            params.append('page', String(page));
+            params.append('size', '10'); // 페이지당 10개 항목
+            // 쿼리 파라미터를 생성 end !!
+
             // 벌금 목록 API를 호출한다.
-            const res = await fetch(`${API_BASE_URL}/api/penalties?${query.toString()}`, {
+            const res = await fetch(`${API_BASE_URL}/api/penalties?${params.toString()}`, {
                 credentials: 'include',// 브라우저가 쿠키(Cookie), 세션 정보, 인증 정보를 함께 보내도록 하는 옵션
             });
 
@@ -87,10 +116,16 @@ export default function PenaltyListPage() {
             }
 
             // 응답 JSON을 PenaltyResponse 배열로 변환한다.
-            const data: PenaltyResponse[] = await res.json();
+            // const data: PenaltyResponse[] = await res.json();
+            const data: PageResponse<PenaltyResponse> = await res.json();
 
             // 벌금 목록을 상태에 저장한다.
-            setPenalties(data);
+            setPenalties(data.content);
+
+            // 페이지네이션 상태 업데이트
+            setTotalPages(data.totalPages);
+            setCurrentPage(data.number);
+
         } catch (err) {
             // 벌금 조회 실패 시 콘솔에 에러를 출력한다.
             console.error('벌금 현황 불러오는 데 실패하였습니다.:', err);
@@ -147,10 +182,21 @@ export default function PenaltyListPage() {
         }
     };
 
+    // 필터 초기화 버튼을 눌렀을 때 실행되는 함수이다.
+    const handleReset = () => {
+        setFilters({
+            assignees: [],
+            paymentStatus: 'ALL',
+            dateRange: new Date() === null ? null : [new Date(new Date().setDate(new Date().getDate() - 60)), new Date()], // 초기값을 한달 전 ~ 오늘 날짜로 설정
+            size: 10,
+            page: 0,
+        });
+    };
 
-    const [userList, setUserList] = useState<MemberOption[]>([]);
 
-    const fetchUserList = async () => {
+    const [assignees, setAssignees] = useState<MemberOption[]>([]);
+
+    const fetchAssignees = async () => {
         try {
             const res = await fetch(`${API_BASE_URL}/api/users`, {
                 credentials: 'include',
@@ -161,8 +207,8 @@ export default function PenaltyListPage() {
             }
 
             const data: { id: number; name: string }[] = await res.json();
-            const options = data.map((user) => ({ value: String(user.id), label: user.name }));
-            setUserList(options);
+            const options = data.map((user) => ({ value: user.id, label: user.name }));
+            setAssignees(options);
         }
         catch (err) {
             console.error('사용자 목록 조회 실패:', err);
@@ -172,11 +218,14 @@ export default function PenaltyListPage() {
 
     useEffect(() => {
         fetchCurrentUser();
-        fetchPenalties();
-        fetchUserList();
+        fetchPenalties(filters, 0);
+        fetchAssignees();
     }, []);
 
 
+    useEffect(() => {
+        fetchPenalties(filters, 0);
+    }, [filters]); // filters가 바뀔 때마다 자동 검색
 
 
     return (
@@ -190,23 +239,45 @@ export default function PenaltyListPage() {
 
                     </div>
                     <div className='flex justify-between mb-10'>
-                        <div className='flex w-70 gap-4 justify-start' >
-                            <Button className='color-navy' appearance="primary">담당자</Button>
-                            <CheckPicker className='color-navy' data={userList} searchable={false} placeholder="담당자" />
-                            <RadioGroup name="radio-group-inline" inline defaultValue="A">
-                                <Radio value="ALL">전체</Radio>
-                                <Radio value="Y">수납</Radio>
-                                <Radio value="N">미수납</Radio>
-                            </RadioGroup>
-                            <Button className='' appearance="primary">수납여부</Button>
-                            <Button className='' appearance="primary">날짜</Button>
+                        <div className='flex flex-col gap-4 justify-start ' >
+                            <div className='flex gap-4 justify-start' >
+                                <CheckPicker className='color-navy'
+                                    value={filters.assignees}
+                                    data={assignees} searchable={false}
+                                    placeholder="담당자"
+                                    onChange={(value) => setFilters((prev) => ({ ...prev, assignees: value }))}
+                                />
+                                <SelectPicker className='color-navy'
+                                    value={filters.paymentStatus}
+                                    defaultValue='ALL'
+                                    data={[{ value: "ALL", label: "전체" },
+                                    { value: "Y", label: "수납" },
+                                    { value: "N", label: "미수납" }]}
+                                    searchable={false} placeholder="수납 여부"
+                                    onChange={(value) => setFilters((prev) => ({ ...prev, paymentStatus: value ?? 'ALL' }))}
+                                />
+                            </div>
+
+                            <DateRangePicker
+                                value={filters.dateRange}
+                                defaultCalendarValue={[new Date(), new Date()]}
+                                onChange={(value) => setFilters((prev) => ({ ...prev, dateRange: value }))}
+                                placeholder="날짜 범위"
+                                format="yyyy-MM-dd"
+                                // 너비를 auto로 설정하여 내용에 맞게 조절한다.
+                                w={230}
+                                size="md"
+                            />
+
                         </div>
+
+
 
                         <div className='justify-end' >
-                            <Button className='' appearance="primary">초기화</Button>
+                            <Button onClick={handleReset} >초기화</Button>
                         </div>
-
                     </div>
+
 
                     {/* 벌금 목록 영역이다. */}
                     <div className={styles['penalty-list']}>
@@ -214,7 +285,7 @@ export default function PenaltyListPage() {
                             // 벌금 데이터가 있으면 목록을 출력한다.
                             penalties.map((penalty) => (
                                 // 벌금 한 줄이다.
-                                <label key={penalty.id} className={styles['penalty-row']}>
+                                <label key={penalty.id} className={`${styles['penalty-row']}`}>
                                     {isAdmin ? (
                                         // 관리자인 경우 체크박스를 보여준다.
                                         //
@@ -271,11 +342,10 @@ export default function PenaltyListPage() {
                                         {penalty.amount.toLocaleString()}원
                                     </span>
 
-                                    {/* 벌금 정산 상태 문구를 표시한다.
-                      예: 정산완료, 정산필요 */}
-                                    <span className={styles['penalty-status']}>
+                                    <span className={""}>
                                         {penalty.status}
                                     </span>
+
                                 </label>
                             ))
                         ) : (
@@ -285,12 +355,46 @@ export default function PenaltyListPage() {
                             </p>
                         )}
                     </div>
+                    {/* 페이지네이션 */}
+                    <div className='flex justify-center gap-2 mt-4'>
+                        <button
+                            onClick={() => fetchPenalties(filters, currentPage - 1)}
+                            disabled={currentPage === 0}
+                        >
+                            <FiChevronLeft />
+                        </button>
+
+                        {Array.from({ length: totalPages }, (_, i) => (
+                            <button
+                                className='w-100'
+                                key={i}
+                                onClick={() => fetchPenalties(filters, i)}
+                                style={{
+                                    fontWeight: currentPage === i ? 'bold' : 'normal',
+                                    backgroundColor: currentPage === i ? '#1B3A6B' : 'transparent',
+                                    color: currentPage === i ? '#fff' : '#000',
+                                    borderRadius: '4px',
+                                    width: '28px',
+                                    height: '28px',
+                                }}
+                            >
+                                {i + 1}
+                            </button>
+                        ))}
+
+                        <button
+                            onClick={() => fetchPenalties(filters, currentPage + 1)}
+                            disabled={currentPage === totalPages - 1}
+                        >
+                            <FiChevronRight />
+                        </button>
+                    </div>
                 </section>
 
                 {/* 하단 네비게이션이다.
                 active="calendar"는 현재 선택된 메뉴가 calendar라는 의미이다. */}
                 <BottomNav active="calendar" />
             </section>
-        </main>
+        </main >
     );
 }

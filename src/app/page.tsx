@@ -1,5 +1,5 @@
 import LoginButton from '@/components/LoginButton';
-import { getCurrentUser } from '@/lib/api/users';
+import { getCurrentUser } from '@/lib/api/users.server';
 import { redirect } from 'next/navigation';
 
 type CurrentUserResponse = {

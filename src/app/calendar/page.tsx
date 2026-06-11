@@ -74,6 +74,14 @@ type PenaltyResponse = {
   status: string;
 };
 
+type PageResponse<T> = {
+  content: T[];
+  totalPages: number;
+  totalElements: number;
+  size: number;
+  number: number;
+};
+
 // 현재 로그인한 사용자 정보를 받을 때 사용하는 타입이다.
 //
 // id와 userSeq는 둘 중 어떤 이름으로 내려와도 받을 수 있게
@@ -287,9 +295,13 @@ export default function CalendarPage() {
 
   // 벌금 현황 목록을 백엔드에서 가져오는 함수이다.
   const fetchPenalties = async () => {
+    // 메인 페이지에서는 페이지네이션이 필요 없으므로 page와 size를 고정값으로 설정한다.
+    const size = 10; // 예시: 10개의 벌금만 조회
+    const page = 0; // 첫 페이지를 조회한다.
+
     try {
       // 벌금 목록 API를 호출한다.
-      const res = await fetch(`${API_BASE_URL}/api/penalties`, {
+      const res = await fetch(`${API_BASE_URL}/api/penalties?page=${page}&size=${size}`, {
         credentials: 'include',
       });
 
@@ -299,10 +311,10 @@ export default function CalendarPage() {
       }
 
       // 응답 JSON을 PenaltyResponse 배열로 변환한다.
-      const data: PenaltyResponse[] = await res.json();
-
+      const data: PageResponse<PenaltyResponse> = await res.json();
       // 벌금 목록을 상태에 저장한다.
-      setPenalties(data);
+      setPenalties(data.content);
+
     } catch (err) {
       // 벌금 조회 실패 시 콘솔에 에러를 출력한다.
       console.error('벌금 현황 불러오는 데 실패하였습니다.:', err);
@@ -556,7 +568,7 @@ export default function CalendarPage() {
         {/* 벌금 현황 영역이다. */}
         <section className={styles['penalty-section']}>
           {/* 벌금 영역 상단 제목 부분이다. */}
-          <div className={styles['penalty-header']} onClick={() => router.push('/penalty/list')}>
+          <div className={styles['penalty-header']} onClick={() => router.push('/penalty/list')} style={{ cursor: 'pointer' }}>
             <h2>Penalty</h2>
 
             {/* 더보기 버튼처럼 보이는 버튼이다.
