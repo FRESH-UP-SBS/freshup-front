@@ -130,3 +130,8 @@
     @apply font-sans;
   }
 }
+
+/* rsuite picker 드롭다운이 모달 위에 렌더링되도록 z-index 보정 */
+.rs-picker-popup {
+  z-index: 9999 !important;
+}

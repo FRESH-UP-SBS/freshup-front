@@ -6,7 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import { filterAndSortList } from 'next/dist/build/utils';
 import { useEffect, useState } from 'react';
 import { Button, Radio, RadioGroup, CheckPicker, SelectPicker, DateRangePicker } from 'rsuite';
-import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
+import { FiChevronLeft, FiChevronRight, FiPlus, FiEdit2, FiTrash2 } from "react-icons/fi";
+import PenaltyAddModal from '@/components/penalty/PenaltyAddModal';
 
 
 
@@ -53,6 +54,8 @@ const API_BASE_URL =
     process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
 
 export default function PenaltyListPage() {
+    const [mounted, setMounted] = useState(false);
+
     // null이면 사용자 정보를 아직 못 가져왔거나 조회 실패한 상태이다.
     const [currentUser, setCurrentUser] = useState<CurrentUserResponse | null>(
         null
@@ -75,10 +78,11 @@ export default function PenaltyListPage() {
 
 
     // 필터 상태를 관리하는 useState 훅
+    // dateRange 초기값은 null — new Date()를 SSR에서 쓰면 hydration 불일치 발생
     const [filters, setFilters] = useState<FilterState>({
         assignees: [],
         paymentStatus: 'ALL',
-        dateRange: new Date() === null ? null : [new Date(new Date().setDate(new Date().getDate() - 60)), new Date()], // 초기값을 한달 전 ~ 오늘 날짜로 설정
+        dateRange: null,
         size: 10,
         page: 0,
     });
@@ -187,12 +191,52 @@ export default function PenaltyListPage() {
         setFilters({
             assignees: [],
             paymentStatus: 'ALL',
-            dateRange: new Date() === null ? null : [new Date(new Date().setDate(new Date().getDate() - 60)), new Date()], // 초기값을 한달 전 ~ 오늘 날짜로 설정
+            dateRange: [new Date(new Date().setDate(new Date().getDate() - 60)), new Date()],
             size: 10,
             page: 0,
         });
     };
 
+
+    // 관리자가 벌금 등록 모달을 열고 닫는 상태를 관리하는 useState 훅이다.
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [editingPenalty, setEditingPenalty] = useState<PenaltyResponse | null>(null);
+
+    const handleAddPenalty = async (userId: number, amount: number) => {
+        const res = await fetch(`${API_BASE_URL}/api/penalties`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, amount }),
+        });
+        if (!res.ok) throw new Error('벌금 등록 실패');
+        await fetchPenalties(filters, currentPage);
+    };
+
+    const handleEditPenalty = async (userId: number, amount: number) => {
+        if (!editingPenalty) return;
+        const res = await fetch(`${API_BASE_URL}/api/penalties/${editingPenalty.id}`, {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, amount }),
+        });
+        if (!res.ok) throw new Error('벌금 수정 실패');
+        await fetchPenalties(filters, currentPage);
+    };
+
+    const handleDeletePenalty = async (penaltyId: number) => {
+        if (!confirm('벌금을 삭제하시겠습니까?')) return;
+        const res = await fetch(`${API_BASE_URL}/api/penalties/${penaltyId}`, {
+            method: 'DELETE',
+            credentials: 'include',
+        });
+        if (!res.ok) {
+            alert('벌금 삭제에 실패했습니다.');
+            return;
+        }
+        await fetchPenalties(filters, currentPage);
+    };
 
     const [assignees, setAssignees] = useState<MemberOption[]>([]);
 
@@ -217,9 +261,15 @@ export default function PenaltyListPage() {
 
 
     useEffect(() => {
+        setMounted(true);
+        const defaultDateRange: [Date, Date] = [
+            new Date(new Date().setDate(new Date().getDate() - 60)),
+            new Date(),
+        ];
         fetchCurrentUser();
-        fetchPenalties(filters, 0);
         fetchAssignees();
+        // 날짜 초기값을 클라이언트에서만 세팅 → filters useEffect가 자동으로 fetchPenalties 호출
+        setFilters((prev) => ({ ...prev, dateRange: defaultDateRange }));
     }, []);
 
 
@@ -236,7 +286,15 @@ export default function PenaltyListPage() {
                     {/* 벌금 영역 상단 제목 부분이다. */}
                     <div className={styles['penalty-header']}>
                         <h2>Penalty</h2>
-
+                        {isAdmin && (
+                            <button
+                                onClick={() => setIsAddModalOpen(true)}
+                                className="flex items-center justify-center w-7 h-7 rounded-full  text-white hover:opacity-80"
+                                title="벌금 등록"
+                            >
+                                <FiPlus size={16} />
+                            </button>
+                        )}
                     </div>
                     <div className='flex justify-between mb-10'>
                         <div className='flex flex-col gap-4 justify-start ' >
@@ -258,16 +316,16 @@ export default function PenaltyListPage() {
                                 />
                             </div>
 
-                            <DateRangePicker
-                                value={filters.dateRange}
-                                defaultCalendarValue={[new Date(), new Date()]}
-                                onChange={(value) => setFilters((prev) => ({ ...prev, dateRange: value }))}
-                                placeholder="날짜 범위"
-                                format="yyyy-MM-dd"
-                                // 너비를 auto로 설정하여 내용에 맞게 조절한다.
-                                w={230}
-                                size="md"
-                            />
+                            {mounted && (
+                                <DateRangePicker
+                                    value={filters.dateRange}
+                                    onChange={(value) => setFilters((prev) => ({ ...prev, dateRange: value }))}
+                                    placeholder="날짜 범위"
+                                    format="yyyy-MM-dd"
+                                    w={230}
+                                    size="md"
+                                />
+                            )}
 
                         </div>
 
@@ -285,13 +343,9 @@ export default function PenaltyListPage() {
                             // 벌금 데이터가 있으면 목록을 출력한다.
                             penalties.map((penalty) => (
                                 // 벌금 한 줄이다.
-                                <label key={penalty.id} className={`${styles['penalty-row']}`}>
+                                <div key={penalty.id} className={styles['penalty-row']}>
+                                    {/* 체크박스 (관리자) 또는 불릿 (일반) */}
                                     {isAdmin ? (
-                                        // 관리자인 경우 체크박스를 보여준다.
-                                        //
-                                        // 체크 상태:
-                                        // adjustmentYn이 'Y'이면 체크됨
-                                        // adjustmentYn이 'N'이면 체크 안 됨
                                         <input
                                             type="checkbox"
                                             className={styles['penalty-checkbox']}
@@ -299,54 +353,39 @@ export default function PenaltyListPage() {
                                             onChange={() => handleTogglePenalty(penalty.id)}
                                         />
                                     ) : (
-                                        // 일반 사용자인 경우 실제 input checkbox가 아니라
-                                        // 토글처럼 보이는 span을 보여준다.
-                                        //
-                                        // aria-hidden="true"는
-                                        // 화면 표시용 장식 요소라는 의미이다.
-                                        <span
-                                            style={{
-                                                width: '8px',
-                                                height: '8px',
-                                                borderRadius: '50%',
-                                                backgroundColor: '#000',
-                                            }}
-                                        >
-                                            {/* 토글 안의 동그란 버튼처럼 보이는 부분이다. */}
-                                            <span
-                                                style={{
-                                                    width: '14px',
-                                                    height: '14px',
-                                                    borderRadius: '50%',
-                                                    backgroundColor:
-                                                        penalty.adjustmentYn === 'Y' ? '#fff' : '#999',
-
-                                                    // 정산 완료 Y이면 오른쪽으로 이동하고,
-                                                    // 정산 필요 N이면 왼쪽에 둔다.
-                                                    transform:
-                                                        penalty.adjustmentYn === 'Y'
-                                                            ? 'translateX(16px)'
-                                                            : 'translateX(0)',
-
-                                                    // 토글 위치가 바뀔 때 부드럽게 움직이도록 한다.
-                                                    transition: 'transform 0.2s ease',
-                                                }}
-                                            />
-                                        </span>
+                                        <span className={styles['penalty-bullet']} />
                                     )}
 
-                                    {/* 벌금 대상 사용자 이름을 표시한다. */}
                                     <span className={styles['penalty-name']}>{penalty.name}</span>
 
                                     <span className={styles['penalty-amount']}>
                                         {penalty.amount.toLocaleString()}원
                                     </span>
 
-                                    <span className={""}>
+                                    <span className={styles['penalty-status']}>
                                         {penalty.status}
                                     </span>
 
-                                </label>
+                                    {/* 관리자 전용 수정/삭제 버튼 */}
+                                    {isAdmin && (
+                                        <div className={styles['penalty-actions']}>
+                                            <button
+                                                onClick={() => setEditingPenalty(penalty)}
+                                                className="text-gray-400 hover:text-[#1B3A6B]"
+                                                title="벌금 수정"
+                                            >
+                                                <FiEdit2 size={14} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeletePenalty(penalty.id)}
+                                                className="text-gray-400 hover:text-red-500"
+                                                title="벌금 삭제"
+                                            >
+                                                <FiTrash2 size={14} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             ))
                         ) : (
                             // 벌금 데이터가 없으면 안내 문구를 보여준다.
@@ -390,6 +429,26 @@ export default function PenaltyListPage() {
                         </button>
                     </div>
                 </section>
+
+                {/* 벌금 등록 모달 */}
+                {isAddModalOpen && (
+                    <PenaltyAddModal
+                        members={assignees}
+                        onClose={() => setIsAddModalOpen(false)}
+                        onSubmit={handleAddPenalty}
+                    />
+                )}
+
+                {editingPenalty && (
+                    <PenaltyAddModal
+                        mode="edit"
+                        initialUserId={editingPenalty.userId}
+                        initialAmount={editingPenalty.amount}
+                        members={assignees}
+                        onClose={() => setEditingPenalty(null)}
+                        onSubmit={handleEditPenalty}
+                    />
+                )}
 
                 {/* 하단 네비게이션이다.
                 active="calendar"는 현재 선택된 메뉴가 calendar라는 의미이다. */}

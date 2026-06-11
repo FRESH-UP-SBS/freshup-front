@@ -467,8 +467,7 @@
 }
 
 .penalty-list {
-  width: fit-content;
-  max-width: 100%;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -476,10 +475,9 @@
 }
 
 .penalty-row {
-  display: grid;
-  grid-template-columns: 28px 110px 100px 100px;
+  display: flex;
   align-items: center;
-  column-gap: 18px;
+  gap: 16px;
   color: #1f2937;
   font-size: 16px;
   font-weight: 800;
@@ -489,15 +487,43 @@
   width: 18px;
   height: 18px;
   accent-color: #000000;
+  flex-shrink: 0;
+}
+
+.penalty-bullet {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #1f2937;
+  flex-shrink: 0;
 }
 
 .penalty-name {
   text-align: left;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.penalty-amount,
+.penalty-amount {
+  text-align: right;
+  white-space: nowrap;
+}
+
 .penalty-status {
   text-align: right;
+  white-space: nowrap;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.penalty-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
 }
 
 /* 모바일 벌금현황 */
@@ -514,13 +540,16 @@
   }
 
   .penalty-row {
-    grid-template-columns: 24px 1fr auto;
     gap: 10px;
     font-size: 13px;
   }
 
   .penalty-status {
     display: none;
+  }
+
+  .penalty-actions {
+    gap: 6px;
   }
 }
 
